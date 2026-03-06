@@ -129,6 +129,34 @@ func (s *RoleService) GetMenuList() ([]model.Menu, error) {
 	return menus, err
 }
 
+// GetUserRolesDetail 获取用户角色详情（含 code）
+func (s *RoleService) GetUserRolesDetail(userID int64) ([]model.Role, error) {
+	var roles []model.Role
+	err := s.db.Model(&model.Role{}).
+		Joins("JOIN system_user_role ON system_user_role.role_id = system_role.id").
+		Where("system_user_role.user_id = ?", userID).
+		Find(&roles).Error
+	return roles, err
+}
+
+// ListAllMenus 获取全部菜单
+func (s *RoleService) ListAllMenus() ([]model.Menu, error) {
+	return s.GetMenuList()
+}
+
+// GetUserMenus 获取用户可访问的菜单
+func (s *RoleService) GetUserMenus(userID int64) ([]model.Menu, error) {
+	var menus []model.Menu
+	err := s.db.Model(&model.Menu{}).
+		Joins("JOIN system_role_menu ON system_role_menu.menu_id = system_menu.id").
+		Joins("JOIN system_user_role ON system_user_role.role_id = system_role_menu.role_id").
+		Where("system_user_role.user_id = ? AND system_menu.status = 1", userID).
+		Order("system_menu.sort ASC, system_menu.id ASC").
+		Distinct().
+		Find(&menus).Error
+	return menus, err
+}
+
 // IsAdmin 检查用户是否是管理员（拥有 admin 角色）
 func (s *RoleService) IsAdmin(userID int64) bool {
 	var count int64
