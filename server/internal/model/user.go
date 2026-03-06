@@ -32,3 +32,27 @@ type LoginResponse struct {
 	Token string `json:"token"`
 	User  *User  `json:"user"`
 }
+
+type UserListRequest struct {
+	Page     int    `form:"page,default=1"`
+	PageSize int    `form:"pageSize,default=20"`
+	Username string `form:"username"`
+	Nickname string `form:"nickname"`
+	Status   *int8  `form:"status"`
+}
+
+type UserCreateRequest struct {
+	Username string `json:"username" binding:"required"`
+	Password string `json:"password" binding:"required"`
+	Nickname string `json:"nickname"`
+	Mobile   string `json:"mobile"`
+	Email    string `json:"email"`
+}
+
+type UserUpdateRequest struct {
+	Nickname string `json:"nickname"`
+	Mobile   string `json:"mobile"`
+	Email    string `json:"email"`
+	Status   *int8  `json:"status"`
+	Avatar   string `json:"avatar"`
+}

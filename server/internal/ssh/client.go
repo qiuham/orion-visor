@@ -6,6 +6,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -122,6 +123,11 @@ func (c *Client) RunCommand(cmd string) (string, error) {
 // Dial opens a network connection through the SSH tunnel
 func (c *Client) Dial(network, addr string) (net.Conn, error) {
 	return c.conn.Dial(network, addr)
+}
+
+// NewSftpClient creates an SFTP client over the SSH connection
+func (c *Client) NewSftpClient() (*sftp.Client, error) {
+	return sftp.NewClient(c.conn)
 }
 
 // Close closes the SSH connection

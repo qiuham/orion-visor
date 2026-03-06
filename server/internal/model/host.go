@@ -13,6 +13,7 @@ type Host struct {
 	Status     int8      `json:"status" gorm:"default:1"` // 1=enabled 2=disabled
 	Tags       string    `json:"tags" gorm:"size:512"`
 	Remark     string    `json:"remark" gorm:"size:512"`
+	IdentityID int64    `json:"identityId" gorm:"default:0"` // 关联凭证 ID
 	CreateTime time.Time `json:"createTime" gorm:"autoCreateTime"`
 	UpdateTime time.Time `json:"updateTime" gorm:"autoUpdateTime"`
 	Creator    string    `json:"creator" gorm:"size:64"`
@@ -74,10 +75,32 @@ type HostCreateRequest struct {
 }
 
 type HostUpdateRequest struct {
-	Name    string `json:"name"`
-	Address string `json:"address"`
-	Port    int    `json:"port"`
-	Status  *int8  `json:"status"`
-	Tags    string `json:"tags"`
-	Remark  string `json:"remark"`
+	Name       string `json:"name"`
+	Address    string `json:"address"`
+	Port       int    `json:"port"`
+	Status     *int8  `json:"status"`
+	Tags       string `json:"tags"`
+	Remark     string `json:"remark"`
+	IdentityID *int64 `json:"identityId"`
+}
+
+// HostIdentity request types
+
+type HostIdentityCreateRequest struct {
+	Name       string `json:"name" binding:"required"`
+	Type       string `json:"type" binding:"required"` // password, key
+	Username   string `json:"username" binding:"required"`
+	Password   string `json:"password"`
+	KeyText    string `json:"keyText"`
+	Passphrase string `json:"passphrase"`
+	Remark     string `json:"remark"`
+}
+
+type HostIdentityUpdateRequest struct {
+	Name       string `json:"name"`
+	Username   string `json:"username"`
+	Password   string `json:"password"`
+	KeyText    string `json:"keyText"`
+	Passphrase string `json:"passphrase"`
+	Remark     string `json:"remark"`
 }

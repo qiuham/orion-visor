@@ -32,3 +32,7 @@ func Fail(c *gin.Context, msg string) {
 func Unauthorized(c *gin.Context, msg string) {
 	c.JSON(http.StatusUnauthorized, Result{Code: 401, Message: msg})
 }
+
+func Forbidden(c *gin.Context, msg string) {
+	c.JSON(http.StatusForbidden, Result{Code: 403, Message: msg})
+}
