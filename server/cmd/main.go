@@ -40,6 +40,8 @@ func main() {
 	identitySvc := service.NewIdentityService(db)
 	groupSvc := service.NewHostGroupService(db)
 	auditSvc := service.NewAuditService(db)
+	sessionSvc := service.NewTerminalSessionService(db)
+	systemSvc := service.NewSystemService(db)
 
 	// 获取 SSH 配置的辅助函数（集成凭证管理）
 	getSSHConfig := func(hostID int64) (*internalssh.ConnectConfig, error) {
@@ -68,6 +70,10 @@ func main() {
 		return sshCfg, nil
 	}
 
+	// 批量执行和定时任务服务
+	execSvc := service.NewExecService(db, hostSvc, getSSHConfig)
+	cronSvc := service.NewCronService(db, hostSvc, getSSHConfig)
+
 	// 初始化 API
 	authAPI := api.NewAuthAPI(userSvc)
 	userAPI := api.NewUserAPI(userSvc)
@@ -78,6 +84,13 @@ func main() {
 	auditAPI := api.NewAuditAPI(auditSvc)
 	monitorAPI := api.NewMonitorAPI(getSSHConfig, cfg.Monitor.Interval, cfg.Monitor.Retain)
 	sftpAPI := api.NewSftpAPI(getSSHConfig)
+	execAPI := api.NewExecAPI(execSvc)
+	termSessionAPI := api.NewTerminalSessionAPI(sessionSvc)
+	systemAPI := api.NewSystemAPI(systemSvc)
+	cronAPI := api.NewCronAPI(cronSvc)
+
+	// 启动定时任务
+	cronSvc.StartAllJobs()
 
 	// 设置路由
 	gin.SetMode(cfg.Server.Mode)
@@ -186,6 +199,71 @@ func main() {
 			sftpGroup.POST("/save", middleware.AuditLog("sftp", "save", 1), sftpAPI.SaveContent)
 		}
 
+		// 批量命令执行
+		exec := auth.Group("/exec")
+		{
+			exec.POST("/job", middleware.RequirePermission("exec:execute"),
+				middleware.AuditLog("exec", "create", 2), execAPI.CreateJob)
+			exec.GET("/job", middleware.RequirePermission("exec:query"), execAPI.ListJobs)
+			exec.GET("/job/:id", middleware.RequirePermission("exec:query"), execAPI.GetJob)
+			exec.GET("/job/:id/hosts", middleware.RequirePermission("exec:query"), execAPI.GetJobHosts)
+			exec.PUT("/job/:id/cancel", middleware.RequirePermission("exec:execute"),
+				middleware.AuditLog("exec", "cancel", 1), execAPI.CancelJob)
+		}
+
+		// 命令片段
+		snippets := auth.Group("/command-snippet")
+		{
+			snippets.GET("", execAPI.ListSnippets)
+			snippets.POST("", execAPI.CreateSnippet)
+			snippets.PUT("/:id", execAPI.UpdateSnippet)
+			snippets.DELETE("/:id", execAPI.DeleteSnippet)
+		}
+
+		// 终端录屏回放
+		termSession := auth.Group("/terminal-session")
+		{
+			termSession.GET("", middleware.RequirePermission("audit:query"), termSessionAPI.List)
+			termSession.GET("/:id", middleware.RequirePermission("audit:query"), termSessionAPI.Get)
+			termSession.GET("/:id/data", middleware.RequirePermission("audit:query"), termSessionAPI.GetData)
+			termSession.DELETE("/:id", middleware.RequirePermission("audit:delete"),
+				middleware.AuditLog("terminalSession", "delete", 2), termSessionAPI.Delete)
+		}
+
+		// 系统配置
+		system := auth.Group("/system")
+		{
+			system.GET("/setting", middleware.RequirePermission("system:query"), systemAPI.GetSettings)
+			system.PUT("/setting/:item", middleware.RequirePermission("system:update"),
+				middleware.AuditLog("system", "updateSetting", 2), systemAPI.UpdateSetting)
+		}
+
+		// 字典管理
+		dict := auth.Group("/dict")
+		{
+			dict.GET("/key", systemAPI.ListDictKeys)
+			dict.POST("/key", middleware.RequirePermission("system:update"), systemAPI.CreateDictKey)
+			dict.DELETE("/key/:id", middleware.RequirePermission("system:update"), systemAPI.DeleteDictKey)
+			dict.GET("/value/:keyName", systemAPI.ListDictValues)
+			dict.POST("/value", middleware.RequirePermission("system:update"), systemAPI.CreateDictValue)
+			dict.DELETE("/value/:id", middleware.RequirePermission("system:update"), systemAPI.DeleteDictValue)
+		}
+
+		// 定时任务
+		cron := auth.Group("/cron")
+		{
+			cron.GET("", middleware.RequirePermission("cron:query"), cronAPI.List)
+			cron.POST("", middleware.RequirePermission("cron:create"),
+				middleware.AuditLog("cron", "create", 2), cronAPI.Create)
+			cron.PUT("/:id", middleware.RequirePermission("cron:update"),
+				middleware.AuditLog("cron", "update", 2), cronAPI.Update)
+			cron.DELETE("/:id", middleware.RequirePermission("cron:delete"),
+				middleware.AuditLog("cron", "delete", 2), cronAPI.Delete)
+			cron.POST("/:id/trigger", middleware.RequirePermission("cron:execute"),
+				middleware.AuditLog("cron", "trigger", 2), cronAPI.Trigger)
+			cron.GET("/:id/logs", middleware.RequirePermission("cron:query"), cronAPI.GetLogs)
+		}
+
 		// 审计日志
 		audit := auth.Group("/audit")
 		{
@@ -197,7 +275,17 @@ func main() {
 	// WebSocket 接口（需要 token 参数认证）
 	wsGroup := r.Group("/ws", wsTokenAuth())
 	{
-		wsGroup.GET("/terminal/:hostId", ws.HandleTerminalWS(getSSHConfig))
+		wsGroup.GET("/terminal/:hostId", ws.HandleTerminalWS(&ws.TerminalDeps{
+			GetSSHConfig: getSSHConfig,
+			SessionSvc:   sessionSvc,
+			HostName: func(hostID int64) (string, string) {
+				host, err := hostSvc.GetByID(hostID)
+				if err != nil {
+					return "", ""
+				}
+				return host.Name, host.Address
+			},
+		}))
 		wsGroup.GET("/monitor/:hostId", monitorAPI.HandleMonitorWS)
 	}
 
@@ -247,6 +335,17 @@ func autoMigrate(db *gorm.DB) {
 		&model.HostGroupRel{},
 		&model.OperationLog{},
 		&model.ConnectLog{},
+		&model.CommandSnippet{},
+		&model.CommandSnippetGroup{},
+		&model.ExecJob{},
+		&model.ExecJobHost{},
+		&model.TerminalSession{},
+		&model.TerminalSessionData{},
+		&model.SystemSetting{},
+		&model.DictKey{},
+		&model.DictValue{},
+		&model.CronJob{},
+		&model.CronJobLog{},
 	)
 	log.Println("数据库迁移完成")
 }

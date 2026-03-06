@@ -1,14 +1,19 @@
 package ws
 
 import (
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"github.com/orion-visor/server/internal/service"
 	internalssh "github.com/orion-visor/server/internal/ssh"
 )
 
@@ -31,12 +36,67 @@ type SessionManager struct {
 }
 
 type TerminalSession struct {
-	ID      string
-	UserID  int64
-	HostID  int64
-	Client  *internalssh.Client
-	WS      *websocket.Conn
-	done    chan struct{}
+	ID        string
+	UserID    int64
+	HostID    int64
+	Client    *internalssh.Client
+	WS        *websocket.Conn
+	done      chan struct{}
+	// 录屏相关
+	RecordID  int64
+	recorder  *sessionRecorder
+}
+
+// sessionRecorder 录屏数据缓冲
+type sessionRecorder struct {
+	sessionSvc *service.TerminalSessionService
+	sessionID  int64
+	sequence   int
+	buf        strings.Builder
+	mu         sync.Mutex
+	flushTimer *time.Timer
+}
+
+func newSessionRecorder(sessionSvc *service.TerminalSessionService, sessionID int64) *sessionRecorder {
+	r := &sessionRecorder{
+		sessionSvc: sessionSvc,
+		sessionID:  sessionID,
+	}
+	r.flushTimer = time.AfterFunc(2*time.Second, r.flush)
+	return r
+}
+
+func (r *sessionRecorder) write(data []byte) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	// 按 asciicast 格式记录: [时间, "o", 数据]
+	entry := fmt.Sprintf("[%d,\"o\",%q]\n", time.Now().UnixMilli(), base64.StdEncoding.EncodeToString(data))
+	r.buf.WriteString(entry)
+	// 每 64KB 刷新一次
+	if r.buf.Len() > 64*1024 {
+		r.flushLocked()
+	}
+}
+
+func (r *sessionRecorder) flush() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.flushLocked()
+}
+
+func (r *sessionRecorder) flushLocked() {
+	if r.buf.Len() == 0 {
+		return
+	}
+	r.sequence++
+	r.sessionSvc.AppendData(r.sessionID, r.sequence, r.buf.String())
+	r.buf.Reset()
+	r.flushTimer.Reset(2 * time.Second)
+}
+
+func (r *sessionRecorder) close() {
+	r.flushTimer.Stop()
+	r.flush()
 }
 
 var Sessions = &SessionManager{
@@ -61,8 +121,22 @@ func (m *SessionManager) Get(id string) *TerminalSession {
 	return m.sessions[id]
 }
 
-// HandleTerminalWS handles WebSocket connections for SSH terminal
-func HandleTerminalWS(getSSHConfig func(hostID int64) (*internalssh.ConnectConfig, error)) gin.HandlerFunc {
+// Count 返回活跃会话数
+func (m *SessionManager) Count() int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return len(m.sessions)
+}
+
+// TerminalDeps 终端所需的依赖
+type TerminalDeps struct {
+	GetSSHConfig func(hostID int64) (*internalssh.ConnectConfig, error)
+	SessionSvc   *service.TerminalSessionService
+	HostName     func(hostID int64) (string, string) // name, addr
+}
+
+// HandleTerminalWS handles WebSocket connections for SSH terminal with recording
+func HandleTerminalWS(deps *TerminalDeps) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		hostIDStr := c.Param("hostId")
 		hostID, err := strconv.ParseInt(hostIDStr, 10, 64)
@@ -72,6 +146,8 @@ func HandleTerminalWS(getSSHConfig func(hostID int64) (*internalssh.ConnectConfi
 		}
 
 		userID, _ := c.Get("userId")
+		username, _ := c.Get("username")
+		usernameStr, _ := username.(string)
 
 		conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 		if err != nil {
@@ -81,7 +157,7 @@ func HandleTerminalWS(getSSHConfig func(hostID int64) (*internalssh.ConnectConfi
 		defer conn.Close()
 
 		// Get SSH config for this host
-		sshCfg, err := getSSHConfig(hostID)
+		sshCfg, err := deps.GetSSHConfig(hostID)
 		if err != nil {
 			writeWSError(conn, "failed to get host config: "+err.Error())
 			return
@@ -107,7 +183,7 @@ func HandleTerminalWS(getSSHConfig func(hostID int64) (*internalssh.ConnectConfi
 		defer session.Close()
 
 		// Track session
-		sessionID := hostIDStr + "-" + strconv.FormatInt(userID.(int64), 10)
+		sessionID := hostIDStr + "-" + strconv.FormatInt(userID.(int64), 10) + "-" + strconv.FormatInt(time.Now().UnixMilli(), 36)
 		ts := &TerminalSession{
 			ID:     sessionID,
 			UserID: userID.(int64),
@@ -116,10 +192,32 @@ func HandleTerminalWS(getSSHConfig func(hostID int64) (*internalssh.ConnectConfi
 			WS:     conn,
 			done:   make(chan struct{}),
 		}
-		Sessions.Add(ts)
-		defer Sessions.Remove(sessionID)
 
-		// Read SSH stdout → WebSocket
+		// 创建录屏会话
+		if deps.SessionSvc != nil {
+			hostName, hostAddr := "", ""
+			if deps.HostName != nil {
+				hostName, hostAddr = deps.HostName(hostID)
+			}
+			record, err := deps.SessionSvc.CreateSession(
+				userID.(int64), usernameStr, hostID, hostName, hostAddr, sessionID,
+			)
+			if err == nil {
+				ts.RecordID = record.ID
+				ts.recorder = newSessionRecorder(deps.SessionSvc, record.ID)
+			}
+		}
+
+		Sessions.Add(ts)
+		defer func() {
+			Sessions.Remove(sessionID)
+			if ts.recorder != nil {
+				ts.recorder.close()
+				deps.SessionSvc.CloseSession(sessionID)
+			}
+		}()
+
+		// Read SSH stdout → WebSocket (with recording)
 		go func() {
 			buf := make([]byte, 8192)
 			for {
@@ -129,7 +227,12 @@ func HandleTerminalWS(getSSHConfig func(hostID int64) (*internalssh.ConnectConfi
 					return
 				}
 				if n > 0 {
-					conn.WriteMessage(websocket.TextMessage, buf[:n])
+					data := buf[:n]
+					conn.WriteMessage(websocket.TextMessage, data)
+					// 录屏
+					if ts.recorder != nil {
+						ts.recorder.write(data)
+					}
 				}
 			}
 		}()
