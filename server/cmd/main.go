@@ -93,7 +93,7 @@ func main() {
 	rdAPI := api.NewRemoteDesktopAPI(rdSvc)
 
 	// 前端兼容 API 适配器
-	compatAPI := api.NewCompatAPI(userSvc, hostSvc, roleSvc, identitySvc, groupSvc)
+	compatAPI := api.NewCompatAPI(userSvc, hostSvc, roleSvc, identitySvc, groupSvc, systemSvc)
 
 	// 启动定时任务
 	cronSvc.StartAllJobs()
@@ -140,6 +140,10 @@ func main() {
 
 		// 用户管理
 		compat.POST("/infra/system-user/query", compatAPI.QueryUsers)
+		compat.GET("/infra/system-user/list", compatAPI.ListSystemUsers)
+
+		// 角色管理
+		compat.GET("/infra/system-role/list", compatAPI.ListSystemRoles)
 
 		// 菜单管理
 		compat.POST("/infra/system-menu/list", func(c *gin.Context) {
@@ -158,34 +162,34 @@ func main() {
 		compat.POST("/asset/host/query", compatAPI.QueryHosts)
 		compat.POST("/asset/host/count", func(c *gin.Context) { response.OK(c, 0) })
 		compat.DELETE("/asset/host/delete", compatAPI.DeleteHost)
-		compat.DELETE("/asset/host/batch-delete", func(c *gin.Context) { response.OK(c, nil) })
+		compat.DELETE("/asset/host/batch-delete", compatAPI.BatchDeleteHost)
 		compat.POST("/asset/host/test-connect", func(c *gin.Context) { response.OK(c, nil) })
 
 		// 主机凭证
-		compat.POST("/asset/host-identity/create", func(c *gin.Context) { response.OK(c, nil) })
-		compat.PUT("/asset/host-identity/update", func(c *gin.Context) { response.OK(c, nil) })
-		compat.GET("/asset/host-identity/get", func(c *gin.Context) { response.OK(c, nil) })
+		compat.POST("/asset/host-identity/create", compatAPI.CreateHostIdentity)
+		compat.PUT("/asset/host-identity/update", compatAPI.UpdateHostIdentity)
+		compat.GET("/asset/host-identity/get", compatAPI.GetHostIdentity)
 		compat.POST("/asset/host-identity/query", compatAPI.QueryHostIdentities)
 		compat.GET("/asset/host-identity/list", compatAPI.ListHostIdentities)
-		compat.DELETE("/asset/host-identity/delete", func(c *gin.Context) { response.OK(c, nil) })
+		compat.DELETE("/asset/host-identity/delete", compatAPI.DeleteHostIdentity)
 
 		// 主机密钥
 		compat.GET("/asset/host-key/list", func(c *gin.Context) { response.OK(c, []interface{}{}) })
 		compat.POST("/asset/host-key/query", func(c *gin.Context) { response.OKPage(c, 0, []interface{}{}) })
 
 		// 主机配置
-		compat.GET("/asset/host-config/get", func(c *gin.Context) { response.OK(c, nil) })
-		compat.PUT("/asset/host-config/update", func(c *gin.Context) { response.OK(c, nil) })
-		compat.GET("/asset/host-extra/get", func(c *gin.Context) { response.OK(c, nil) })
-		compat.PUT("/asset/host-extra/update", func(c *gin.Context) { response.OK(c, nil) })
+		compat.GET("/asset/host-config/get", compatAPI.GetHostConfig)
+		compat.PUT("/asset/host-config/update", compatAPI.UpdateHostConfig)
+		compat.GET("/asset/host-extra/get", compatAPI.GetHostExtra)
+		compat.PUT("/asset/host-extra/update", compatAPI.UpdateHostExtra)
 
 		// 主机分组
 		compat.GET("/asset/host-group/tree", compatAPI.GetHostGroupTree)
-		compat.POST("/asset/host-group/create", func(c *gin.Context) { response.OK(c, nil) })
-		compat.PUT("/asset/host-group/rename", func(c *gin.Context) { response.OK(c, nil) })
-		compat.DELETE("/asset/host-group/delete", func(c *gin.Context) { response.OK(c, nil) })
-		compat.GET("/asset/host-group/rel-list", func(c *gin.Context) { response.OK(c, []interface{}{}) })
-		compat.PUT("/asset/host-group/update-rel", func(c *gin.Context) { response.OK(c, nil) })
+		compat.POST("/asset/host-group/create", compatAPI.CreateHostGroup)
+		compat.PUT("/asset/host-group/rename", compatAPI.RenameHostGroup)
+		compat.DELETE("/asset/host-group/delete", compatAPI.DeleteHostGroup)
+		compat.GET("/asset/host-group/rel-list", compatAPI.GetHostGroupRelList)
+		compat.PUT("/asset/host-group/update-rel", compatAPI.UpdateHostGroupRel)
 
 		// 授权数据
 		compat.GET("/asset/authorized-data/current-host", compatAPI.GetCurrentAuthorizedHosts)
@@ -214,24 +218,30 @@ func main() {
 
 		// 连接日志
 		compat.POST("/terminal/terminal-connect-log/query", func(c *gin.Context) { response.OKPage(c, 0, []interface{}{}) })
-		compat.GET("/terminal/terminal-connect-log/latest-connect", func(c *gin.Context) { response.OK(c, []interface{}{}) })
+		compat.POST("/terminal/terminal-connect-log/latest-connect", compatAPI.GetLatestConnectHostIds)
 		compat.GET("/terminal/terminal-connect-log/sessions", func(c *gin.Context) { response.OK(c, []interface{}{}) })
 
 		// SFTP 日志
 		compat.POST("/terminal/terminal-file-log/query", func(c *gin.Context) { response.OKPage(c, 0, []interface{}{}) })
 
 		// 统计
-		compat.GET("/terminal/statistics/get-workplace", compatAPI.GetWorkplaceStatistics)
+		compat.GET("/terminal/statistics/get-workplace", compatAPI.GetTerminalWorkplaceStatistics)
+		compat.GET("/infra/statistics/get-workplace", compatAPI.GetInfraWorkplaceStatistics)
+		compat.GET("/exec/statistics/get-workplace", compatAPI.GetExecWorkplaceStatistics)
 
 		// 批量执行
 		compat.POST("/exec/exec-command/exec", func(c *gin.Context) { response.OK(c, nil) })
 		compat.POST("/exec/exec-command-log/query", func(c *gin.Context) { response.OKPage(c, 0, []interface{}{}) })
 		compat.POST("/exec/exec-job-log/query", func(c *gin.Context) { response.OKPage(c, 0, []interface{}{}) })
 
+		// 用户偏好
+		compat.GET("/infra/preference/get", compatAPI.GetPreference)
+		compat.GET("/infra/preference/get-default", compatAPI.GetDefaultPreference)
+		compat.PUT("/infra/preference/update", compatAPI.UpdatePreference)
+		compat.PUT("/infra/preference/update-batch", compatAPI.UpdatePreferenceBatch)
+
 		// 字典 (前端启动时加载)
-		compat.GET("/infra/dict-value/list", func(c *gin.Context) {
-			response.OK(c, gin.H{})
-		})
+		compat.GET("/infra/dict-value/list", compatAPI.GetDictValueList)
 		compat.POST("/infra/dict-key/list", func(c *gin.Context) { response.OK(c, []interface{}{}) })
 		compat.POST("/infra/dict-key/query", func(c *gin.Context) { response.OKPage(c, 0, []interface{}{}) })
 		compat.POST("/infra/dict-value/query", func(c *gin.Context) { response.OKPage(c, 0, []interface{}{}) })
@@ -522,6 +532,8 @@ func autoMigrate(db *gorm.DB) {
 		&model.DictValue{},
 		&model.CronJob{},
 		&model.CronJobLog{},
+		&model.UserPreference{},
+		&model.HostExtra{},
 	)
 	log.Println("数据库迁移完成")
 }

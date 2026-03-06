@@ -7,6 +7,7 @@ package api
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -21,11 +22,12 @@ import (
 
 // CompatAPI 前端兼容 API 适配器
 type CompatAPI struct {
-	userSvc    *service.UserService
-	hostSvc    *service.HostService
-	roleSvc    *service.RoleService
+	userSvc     *service.UserService
+	hostSvc     *service.HostService
+	roleSvc     *service.RoleService
 	identitySvc *service.IdentityService
-	groupSvc   *service.HostGroupService
+	groupSvc    *service.HostGroupService
+	systemSvc   *service.SystemService
 }
 
 func NewCompatAPI(
@@ -34,6 +36,7 @@ func NewCompatAPI(
 	roleSvc *service.RoleService,
 	identitySvc *service.IdentityService,
 	groupSvc *service.HostGroupService,
+	systemSvc *service.SystemService,
 ) *CompatAPI {
 	return &CompatAPI{
 		userSvc:     userSvc,
@@ -41,6 +44,7 @@ func NewCompatAPI(
 		roleSvc:     roleSvc,
 		identitySvc: identitySvc,
 		groupSvc:    groupSvc,
+		systemSvc:   systemSvc,
 	}
 }
 
@@ -599,13 +603,58 @@ func (a *CompatAPI) ListCommandSnippetGroups(c *gin.Context) {
 
 // ========== /terminal/statistics ==========
 
-// GetWorkplaceStatistics GET /terminal/statistics/get-workplace
-func (a *CompatAPI) GetWorkplaceStatistics(c *gin.Context) {
+// GetTerminalWorkplaceStatistics GET /terminal/statistics/get-workplace
+func (a *CompatAPI) GetTerminalWorkplaceStatistics(c *gin.Context) {
+	// 生成最近7天的日期标签
+	dates, data := last7DaysChart()
 	response.OK(c, gin.H{
-		"hostCount":       0,
-		"connectCount":    0,
-		"commandCount":    0,
-		"onlineUserCount": 0,
+		"todayTerminalConnectCount": 0,
+		"weekTerminalConnectCount":  a.systemSvc.CountTerminalSessions(),
+		"terminalConnectChart": gin.H{
+			"x":    dates,
+			"data": data,
+		},
+		"terminalConnectList": []interface{}{},
+	})
+}
+
+// GetInfraWorkplaceStatistics GET /infra/statistics/get-workplace
+func (a *CompatAPI) GetInfraWorkplaceStatistics(c *gin.Context) {
+	userID := c.GetInt64("userId")
+	user, _ := a.userSvc.GetByID(userID)
+	username, nickname := "", ""
+	if user != nil {
+		username = user.Username
+		nickname = user.Nickname
+	}
+	dates, data := last7DaysChart()
+	response.OK(c, gin.H{
+		"userId":             userID,
+		"username":           username,
+		"nickname":           nickname,
+		"unreadMessageCount": 0,
+		"lastLoginTime":      time.Now().UnixMilli(),
+		"userSessionCount":   1,
+		"operatorChart": gin.H{
+			"x":    dates,
+			"data": data,
+		},
+		"loginHistoryList": []interface{}{},
+	})
+}
+
+// GetExecWorkplaceStatistics GET /exec/statistics/get-workplace
+func (a *CompatAPI) GetExecWorkplaceStatistics(c *gin.Context) {
+	dates, data := last7DaysChart()
+	response.OK(c, gin.H{
+		"execJobCount":          0,
+		"todayExecCommandCount": 0,
+		"weekExecCommandCount":  0,
+		"execCommandChart": gin.H{
+			"x":    dates,
+			"data": data,
+		},
+		"execLogList": []interface{}{},
 	})
 }
 
@@ -654,6 +703,404 @@ func (a *CompatAPI) GetMessageCount(c *gin.Context) {
 	response.OK(c, gin.H{})
 }
 
+// ========== /infra/dict-value ==========
+
+// GetDictValueList GET /infra/dict-value/list?keys=key1,key2,...
+func (a *CompatAPI) GetDictValueList(c *gin.Context) {
+	keysParam := c.Query("keys")
+	if keysParam == "" {
+		response.OK(c, gin.H{})
+		return
+	}
+	keys := strings.Split(keysParam, ",")
+	dictMap := a.systemSvc.ListDictValuesByKeys(keys)
+
+	// 转换为前端期望的格式: {keyName: [{label, value, ...}]}
+	result := make(gin.H, len(dictMap))
+	for keyName, values := range dictMap {
+		items := make([]gin.H, 0, len(values))
+		for _, v := range values {
+			item := gin.H{
+				"label": v.Label,
+				"value": v.Value,
+			}
+			// 解析 extra JSON 字段并合并到条目
+			if v.Extra != "" {
+				var extra map[string]interface{}
+				if err := json.Unmarshal([]byte(v.Extra), &extra); err == nil {
+					for ek, ev := range extra {
+						item[ek] = ev
+					}
+				}
+			}
+			items = append(items, item)
+		}
+		result[keyName] = items
+	}
+	response.OK(c, result)
+}
+
+// ========== /infra/preference ==========
+
+// GetPreference GET /infra/preference/get?type=TERMINAL&items=item1,item2
+func (a *CompatAPI) GetPreference(c *gin.Context) {
+	userID := c.GetInt64("userId")
+	prefType := c.Query("type")
+	itemsParam := c.Query("items")
+	var items []string
+	if itemsParam != "" {
+		items = strings.Split(itemsParam, ",")
+	}
+	result := a.systemSvc.GetPreference(userID, prefType, items)
+	response.OK(c, result)
+}
+
+// GetDefaultPreference GET /infra/preference/get-default?type=TERMINAL
+func (a *CompatAPI) GetDefaultPreference(c *gin.Context) {
+	// 返回空对象，前端会使用自己的默认值
+	response.OK(c, gin.H{})
+}
+
+// UpdatePreference PUT /infra/preference/update
+func (a *CompatAPI) UpdatePreference(c *gin.Context) {
+	var req struct {
+		Type  string      `json:"type"`
+		Item  string      `json:"item"`
+		Value interface{} `json:"value"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, "参数错误")
+		return
+	}
+	userID := c.GetInt64("userId")
+	var val string
+	switch v := req.Value.(type) {
+	case string:
+		val = v
+	default:
+		b, _ := json.Marshal(v)
+		val = string(b)
+	}
+	a.systemSvc.UpdatePreference(userID, req.Type, req.Item, val)
+	response.OK(c, nil)
+}
+
+// UpdatePreferenceBatch PUT /infra/preference/update-batch
+func (a *CompatAPI) UpdatePreferenceBatch(c *gin.Context) {
+	var req struct {
+		Type   string                 `json:"type"`
+		Config map[string]interface{} `json:"config"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, "参数错误")
+		return
+	}
+	userID := c.GetInt64("userId")
+	a.systemSvc.UpdatePreferenceBatch(userID, req.Type, req.Config)
+	response.OK(c, nil)
+}
+
+// ========== /asset/host-identity CRUD ==========
+
+// CreateHostIdentity POST /asset/host-identity/create
+func (a *CompatAPI) CreateHostIdentity(c *gin.Context) {
+	var req struct {
+		Name        string `json:"name"`
+		Type        string `json:"type"`
+		Username    string `json:"username"`
+		Password    string `json:"password"`
+		KeyID       int64  `json:"keyId"`
+		Description string `json:"description"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, "参数错误")
+		return
+	}
+	createReq := &model.HostIdentityCreateRequest{
+		Name:     req.Name,
+		Type:     req.Type,
+		Username: req.Username,
+		Password: req.Password,
+		Remark:   req.Description,
+	}
+	identity, err := a.identitySvc.Create(createReq)
+	if err != nil {
+		response.Fail(c, err.Error())
+		return
+	}
+	response.OK(c, identity.ID)
+}
+
+// UpdateHostIdentity PUT /asset/host-identity/update
+func (a *CompatAPI) UpdateHostIdentity(c *gin.Context) {
+	var req struct {
+		ID             int64  `json:"id" binding:"required"`
+		Name           string `json:"name"`
+		Type           string `json:"type"`
+		Username       string `json:"username"`
+		Password       string `json:"password"`
+		UseNewPassword bool   `json:"useNewPassword"`
+		Description    string `json:"description"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, "参数错误")
+		return
+	}
+	updateReq := &model.HostIdentityUpdateRequest{
+		Name:     req.Name,
+		Username: req.Username,
+		Remark:   req.Description,
+	}
+	if req.UseNewPassword {
+		updateReq.Password = req.Password
+	}
+	if err := a.identitySvc.Update(req.ID, updateReq); err != nil {
+		response.Fail(c, err.Error())
+		return
+	}
+	response.OK(c, nil)
+}
+
+// GetHostIdentity GET /asset/host-identity/get?id=
+func (a *CompatAPI) GetHostIdentity(c *gin.Context) {
+	id, _ := strconv.ParseInt(c.Query("id"), 10, 64)
+	identity, err := a.identitySvc.GetByID(id)
+	if err != nil {
+		response.Fail(c, "凭证不存在")
+		return
+	}
+	response.OK(c, gin.H{
+		"id":         identity.ID,
+		"name":       identity.Name,
+		"type":       identity.Type,
+		"username":   identity.Username,
+		"remark":     identity.Remark,
+		"createTime": timeToMs(identity.CreateTime),
+		"updateTime": timeToMs(identity.UpdateTime),
+	})
+}
+
+// DeleteHostIdentity DELETE /asset/host-identity/delete?id=
+func (a *CompatAPI) DeleteHostIdentity(c *gin.Context) {
+	id, _ := strconv.ParseInt(c.Query("id"), 10, 64)
+	if err := a.identitySvc.Delete(id); err != nil {
+		response.Fail(c, err.Error())
+		return
+	}
+	response.OK(c, nil)
+}
+
+// ========== /asset/host-config ==========
+
+// GetHostConfig GET /asset/host-config/get?hostId=&type=
+func (a *CompatAPI) GetHostConfig(c *gin.Context) {
+	hostID, _ := strconv.ParseInt(c.Query("hostId"), 10, 64)
+	configType := c.Query("type")
+	cfg, err := a.systemSvc.GetHostConfig(hostID, configType)
+	if err != nil {
+		response.OK(c, nil)
+		return
+	}
+	// config 字段是 JSON 字符串，直接返回
+	var configData interface{}
+	if err := json.Unmarshal([]byte(cfg.Config), &configData); err == nil {
+		response.OK(c, configData)
+	} else {
+		response.OK(c, cfg.Config)
+	}
+}
+
+// UpdateHostConfig PUT /asset/host-config/update
+func (a *CompatAPI) UpdateHostConfig(c *gin.Context) {
+	var req struct {
+		HostID int64  `json:"hostId" binding:"required"`
+		Type   string `json:"type" binding:"required"`
+		Config string `json:"config"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, "参数错误")
+		return
+	}
+	a.systemSvc.UpdateHostConfig(req.HostID, req.Type, req.Config)
+	response.OK(c, nil)
+}
+
+// ========== /asset/host-extra ==========
+
+// GetHostExtra GET /asset/host-extra/get?hostId=&item=
+func (a *CompatAPI) GetHostExtra(c *gin.Context) {
+	hostID, _ := strconv.ParseInt(c.Query("hostId"), 10, 64)
+	item := c.Query("item")
+	extra, err := a.systemSvc.GetHostExtra(hostID, item)
+	if err != nil {
+		response.OK(c, nil)
+		return
+	}
+	var extraData interface{}
+	if err := json.Unmarshal([]byte(extra.Extra), &extraData); err == nil {
+		response.OK(c, extraData)
+	} else {
+		response.OK(c, extra.Extra)
+	}
+}
+
+// UpdateHostExtra PUT /asset/host-extra/update
+func (a *CompatAPI) UpdateHostExtra(c *gin.Context) {
+	var req struct {
+		HostID int64  `json:"hostId" binding:"required"`
+		Item   string `json:"item" binding:"required"`
+		Extra  string `json:"extra"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, "参数错误")
+		return
+	}
+	a.systemSvc.UpdateHostExtra(req.HostID, req.Item, req.Extra)
+	response.OK(c, nil)
+}
+
+// ========== /asset/host-group CRUD ==========
+
+// CreateHostGroup POST /asset/host-group/create
+func (a *CompatAPI) CreateHostGroup(c *gin.Context) {
+	var req struct {
+		ParentID int64  `json:"parentId"`
+		Name     string `json:"name"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, "参数错误")
+		return
+	}
+	group, err := a.groupSvc.Create(&model.HostGroupCreateRequest{
+		ParentID: req.ParentID,
+		Name:     req.Name,
+	})
+	if err != nil {
+		response.Fail(c, err.Error())
+		return
+	}
+	response.OK(c, group.ID)
+}
+
+// RenameHostGroup PUT /asset/host-group/rename
+func (a *CompatAPI) RenameHostGroup(c *gin.Context) {
+	var req struct {
+		ID   int64  `json:"id" binding:"required"`
+		Name string `json:"name" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, "参数错误")
+		return
+	}
+	if err := a.groupSvc.Update(req.ID, &model.HostGroupUpdateRequest{Name: req.Name}); err != nil {
+		response.Fail(c, err.Error())
+		return
+	}
+	response.OK(c, nil)
+}
+
+// DeleteHostGroup DELETE /asset/host-group/delete?id=
+func (a *CompatAPI) DeleteHostGroup(c *gin.Context) {
+	id, _ := strconv.ParseInt(c.Query("id"), 10, 64)
+	if err := a.groupSvc.Delete(id); err != nil {
+		response.Fail(c, err.Error())
+		return
+	}
+	response.OK(c, nil)
+}
+
+// GetHostGroupRelList GET /asset/host-group/rel-list?groupId=
+func (a *CompatAPI) GetHostGroupRelList(c *gin.Context) {
+	groupID, _ := strconv.ParseInt(c.Query("groupId"), 10, 64)
+	hostIDs, err := a.groupSvc.GetGroupHosts(groupID)
+	if err != nil {
+		response.OK(c, []int64{})
+		return
+	}
+	response.OK(c, hostIDs)
+}
+
+// UpdateHostGroupRel PUT /asset/host-group/update-rel
+func (a *CompatAPI) UpdateHostGroupRel(c *gin.Context) {
+	var req struct {
+		GroupID    int64    `json:"groupId" binding:"required"`
+		HostIDList []string `json:"hostIdList"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, "参数错误")
+		return
+	}
+	hostIDs := make([]int64, 0, len(req.HostIDList))
+	for _, s := range req.HostIDList {
+		id, _ := strconv.ParseInt(s, 10, 64)
+		if id > 0 {
+			hostIDs = append(hostIDs, id)
+		}
+	}
+	if err := a.groupSvc.UpdateGroupHosts(req.GroupID, hostIDs); err != nil {
+		response.Fail(c, err.Error())
+		return
+	}
+	response.OK(c, nil)
+}
+
+// ========== /infra/system-user & /infra/system-role ==========
+
+// ListSystemUsers GET /infra/system-user/list
+func (a *CompatAPI) ListSystemUsers(c *gin.Context) {
+	users, _, _ := a.userSvc.List(&model.UserListRequest{Page: 1, PageSize: 1000})
+	result := make([]gin.H, 0, len(users))
+	for _, u := range users {
+		result = append(result, gin.H{
+			"id":       u.ID,
+			"username": u.Username,
+			"nickname": u.Nickname,
+			"avatar":   u.Avatar,
+			"status":   u.Status,
+		})
+	}
+	response.OK(c, result)
+}
+
+// ListSystemRoles GET /infra/system-role/list
+func (a *CompatAPI) ListSystemRoles(c *gin.Context) {
+	roles, _ := a.roleSvc.List()
+	result := make([]gin.H, 0, len(roles))
+	for _, r := range roles {
+		result = append(result, gin.H{
+			"id":          r.ID,
+			"name":        r.Name,
+			"code":        r.Code,
+			"status":      r.Status,
+			"createTime":  timeToMs(r.CreateTime),
+			"updateTime":  timeToMs(r.UpdateTime),
+		})
+	}
+	response.OK(c, result)
+}
+
+// ========== /terminal/terminal-connect-log ==========
+
+// GetLatestConnectHostIds POST /terminal/terminal-connect-log/latest-connect
+func (a *CompatAPI) GetLatestConnectHostIds(c *gin.Context) {
+	// 返回空数组，前端会处理空值
+	response.OK(c, []int64{})
+}
+
+// ========== /asset/host batch/test ==========
+
+// BatchDeleteHost DELETE /asset/host/batch-delete
+func (a *CompatAPI) BatchDeleteHost(c *gin.Context) {
+	var req struct {
+		IDList []int64 `json:"idList"`
+	}
+	c.ShouldBindJSON(&req)
+	for _, id := range req.IDList {
+		a.hostSvc.Delete(id)
+	}
+	response.OK(c, nil)
+}
+
 // ========== helpers ==========
 
 func parseTags(tags string) []string {
@@ -677,4 +1124,16 @@ func timeToMs(t interface{}) int64 {
 	default:
 		return 0
 	}
+}
+
+// last7DaysChart 生成最近7天的图表数据 (空)
+func last7DaysChart() ([]string, []int) {
+	dates := make([]string, 7)
+	data := make([]int, 7)
+	now := time.Now()
+	for i := 6; i >= 0; i-- {
+		d := now.AddDate(0, 0, -i)
+		dates[6-i] = d.Format("01-02")
+	}
+	return dates, data
 }

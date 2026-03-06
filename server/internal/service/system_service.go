@@ -1,6 +1,8 @@
 package service
 
 import (
+	"encoding/json"
+
 	"github.com/orion-visor/server/internal/model"
 	"gorm.io/gorm"
 )
@@ -95,4 +97,126 @@ func (s *SystemService) CreateDictValue(req *model.DictValueCreateRequest) (*mod
 
 func (s *SystemService) DeleteDictValue(id int64) error {
 	return s.db.Delete(&model.DictValue{}, id).Error
+}
+
+// ListDictValuesByKeys 按 keyName 列表批量查询字典值
+func (s *SystemService) ListDictValuesByKeys(keys []string) map[string][]model.DictValue {
+	result := make(map[string][]model.DictValue)
+	if len(keys) == 0 {
+		return result
+	}
+	var values []model.DictValue
+	s.db.Where("key_name IN ?", keys).Order("sort ASC, id ASC").Find(&values)
+	for _, v := range values {
+		result[v.KeyName] = append(result[v.KeyName], v)
+	}
+	for _, k := range keys {
+		if _, ok := result[k]; !ok {
+			result[k] = []model.DictValue{}
+		}
+	}
+	return result
+}
+
+// --- 用户偏好 ---
+
+func (s *SystemService) GetPreference(userID int64, prefType string, items []string) map[string]interface{} {
+	result := make(map[string]interface{})
+	q := s.db.Model(&model.UserPreference{}).Where("user_id = ? AND type = ?", userID, prefType)
+	if len(items) > 0 {
+		q = q.Where("item IN ?", items)
+	}
+	var prefs []model.UserPreference
+	q.Find(&prefs)
+	for _, p := range prefs {
+		result[p.Item] = p.Value
+	}
+	return result
+}
+
+func (s *SystemService) UpdatePreference(userID int64, prefType, item, value string) error {
+	var pref model.UserPreference
+	err := s.db.Where("user_id = ? AND type = ? AND item = ?", userID, prefType, item).First(&pref).Error
+	if err != nil {
+		pref = model.UserPreference{UserID: userID, Type: prefType, Item: item, Value: value}
+		return s.db.Create(&pref).Error
+	}
+	return s.db.Model(&pref).Update("value", value).Error
+}
+
+func (s *SystemService) UpdatePreferenceBatch(userID int64, prefType string, config map[string]interface{}) error {
+	for item, value := range config {
+		var val string
+		switch v := value.(type) {
+		case string:
+			val = v
+		default:
+			b, _ := json.Marshal(v)
+			val = string(b)
+		}
+		if err := s.UpdatePreference(userID, prefType, item, val); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// --- 主机配置 ---
+
+func (s *SystemService) GetHostConfig(hostID int64, configType string) (*model.HostConfig, error) {
+	var cfg model.HostConfig
+	if err := s.db.Where("host_id = ? AND type = ?", hostID, configType).First(&cfg).Error; err != nil {
+		return nil, err
+	}
+	return &cfg, nil
+}
+
+func (s *SystemService) UpdateHostConfig(hostID int64, configType, config string) error {
+	var cfg model.HostConfig
+	err := s.db.Where("host_id = ? AND type = ?", hostID, configType).First(&cfg).Error
+	if err != nil {
+		cfg = model.HostConfig{HostID: hostID, Type: configType, Config: config}
+		return s.db.Create(&cfg).Error
+	}
+	return s.db.Model(&cfg).Update("config", config).Error
+}
+
+// --- 主机扩展 ---
+
+func (s *SystemService) GetHostExtra(hostID int64, item string) (*model.HostExtra, error) {
+	var extra model.HostExtra
+	if err := s.db.Where("host_id = ? AND item = ?", hostID, item).First(&extra).Error; err != nil {
+		return nil, err
+	}
+	return &extra, nil
+}
+
+func (s *SystemService) UpdateHostExtra(hostID int64, item, extra string) error {
+	var he model.HostExtra
+	err := s.db.Where("host_id = ? AND item = ?", hostID, item).First(&he).Error
+	if err != nil {
+		he = model.HostExtra{HostID: hostID, Item: item, Extra: extra}
+		return s.db.Create(&he).Error
+	}
+	return s.db.Model(&he).Update("extra", extra).Error
+}
+
+// --- 统计 ---
+
+func (s *SystemService) CountHosts() int64 {
+	var count int64
+	s.db.Model(&model.Host{}).Count(&count)
+	return count
+}
+
+func (s *SystemService) CountUsers() int64 {
+	var count int64
+	s.db.Model(&model.User{}).Count(&count)
+	return count
+}
+
+func (s *SystemService) CountTerminalSessions() int64 {
+	var count int64
+	s.db.Model(&model.TerminalSession{}).Count(&count)
+	return count
 }

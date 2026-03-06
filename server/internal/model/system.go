@@ -81,6 +81,35 @@ func (CronJobLog) TableName() string {
 	return "exec_cron_job_log"
 }
 
+// UserPreference 用户偏好设置
+type UserPreference struct {
+	ID         int64     `json:"id" gorm:"primaryKey;autoIncrement"`
+	UserID     int64     `json:"userId" gorm:"index"`
+	Type       string    `json:"type" gorm:"size:32;index"` // SYSTEM, TERMINAL
+	Item       string    `json:"item" gorm:"size:64"`
+	Value      string    `json:"value" gorm:"type:text"`
+	CreateTime time.Time `json:"createTime" gorm:"autoCreateTime"`
+	UpdateTime time.Time `json:"updateTime" gorm:"autoUpdateTime"`
+}
+
+func (UserPreference) TableName() string {
+	return "user_preference"
+}
+
+// HostExtra 主机扩展数据
+type HostExtra struct {
+	ID         int64     `json:"id" gorm:"primaryKey;autoIncrement"`
+	HostID     int64     `json:"hostId" gorm:"index"`
+	Item       string    `json:"item" gorm:"size:32;index"` // SPEC, SSH, RDP, VNC, LABEL
+	Extra      string    `json:"extra" gorm:"type:text"`    // JSON 格式
+	CreateTime time.Time `json:"createTime" gorm:"autoCreateTime"`
+	UpdateTime time.Time `json:"updateTime" gorm:"autoUpdateTime"`
+}
+
+func (HostExtra) TableName() string {
+	return "asset_host_extra"
+}
+
 // Request types
 
 type SystemSettingUpdateRequest struct {
