@@ -9,6 +9,7 @@ type Config struct {
 	JWT      JWTConfig      `mapstructure:"jwt"`
 	SSH      SSHConfig      `mapstructure:"ssh"`
 	Monitor  MonitorConfig  `mapstructure:"monitor"`
+	Guacd    GuacdConfig    `mapstructure:"guacd"`
 }
 
 type ServerConfig struct {
@@ -66,4 +67,22 @@ type SSHConfig struct {
 type MonitorConfig struct {
 	Interval time.Duration `mapstructure:"interval"`
 	Retain   int           `mapstructure:"retain"`
+}
+
+// GuacdConfig Apache Guacamole 守护进程配置
+type GuacdConfig struct {
+	Host string `mapstructure:"host"`
+	Port int    `mapstructure:"port"`
+}
+
+func (g *GuacdConfig) Addr() string {
+	host := g.Host
+	if host == "" {
+		host = "127.0.0.1"
+	}
+	port := g.Port
+	if port == 0 {
+		port = 4822
+	}
+	return host + ":" + itoa(port)
 }

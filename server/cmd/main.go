@@ -42,6 +42,7 @@ func main() {
 	auditSvc := service.NewAuditService(db)
 	sessionSvc := service.NewTerminalSessionService(db)
 	systemSvc := service.NewSystemService(db)
+	rdSvc := service.NewRemoteDesktopService(db, hostSvc, identitySvc)
 
 	// 获取 SSH 配置的辅助函数（集成凭证管理）
 	getSSHConfig := func(hostID int64) (*internalssh.ConnectConfig, error) {
@@ -88,6 +89,7 @@ func main() {
 	termSessionAPI := api.NewTerminalSessionAPI(sessionSvc)
 	systemAPI := api.NewSystemAPI(systemSvc)
 	cronAPI := api.NewCronAPI(cronSvc)
+	rdAPI := api.NewRemoteDesktopAPI(rdSvc)
 
 	// 启动定时任务
 	cronSvc.StartAllJobs()
@@ -158,6 +160,11 @@ func main() {
 			hosts.DELETE("/:id", middleware.RequirePermission("host:delete"),
 				middleware.AuditLog("host", "delete", 2), hostAPI.Delete)
 		}
+
+		// 主机协议配置 (RDP/VNC/SSH 额外参数)
+		auth.GET("/host-config/:hostId/:type", rdAPI.GetHostConfig)
+		auth.PUT("/host-config/:hostId/:type", middleware.RequirePermission("host:update"),
+			middleware.AuditLog("host", "updateConfig", 1), rdAPI.SaveHostConfig)
 
 		// 主机凭证管理
 		identities := auth.Group("/host-identity")
@@ -287,6 +294,23 @@ func main() {
 			},
 		}))
 		wsGroup.GET("/monitor/:hostId", monitorAPI.HandleMonitorWS)
+
+		// RDP/VNC 远程桌面 (通过 guacd 代理)
+		rdDeps := &ws.RemoteDesktopDeps{
+			GuacdAddr:    cfg.Guacd.Addr(),
+			GetRDPConfig: rdSvc.GetRDPConfig,
+			GetVNCConfig: rdSvc.GetVNCConfig,
+			SessionSvc:   sessionSvc,
+			HostName: func(hostID int64) (string, string) {
+				host, err := hostSvc.GetByID(hostID)
+				if err != nil {
+					return "", ""
+				}
+				return host.Name, host.Address
+			},
+		}
+		wsGroup.GET("/rdp/:hostId", ws.HandleRDPWS(rdDeps))
+		wsGroup.GET("/vnc/:hostId", ws.HandleVNCWS(rdDeps))
 	}
 
 	// 启动服务

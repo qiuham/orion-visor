@@ -28,3 +28,8 @@ monitor:
   interval: 3s
   # Keep metrics in memory for rolling chart (seconds)
   retain: 300
+
+# Apache Guacamole 守护进程 (用于 RDP/VNC 远程桌面)
+guacd:
+  host: 127.0.0.1
+  port: 4822
