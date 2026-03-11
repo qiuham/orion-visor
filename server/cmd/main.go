@@ -11,7 +11,6 @@ import (
 	"github.com/orion-visor/server/internal/service"
 	internalssh "github.com/orion-visor/server/internal/ssh"
 	"github.com/orion-visor/server/internal/ws"
-	"github.com/orion-visor/server/pkg/response"
 	"github.com/spf13/viper"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -92,9 +91,6 @@ func main() {
 	cronAPI := api.NewCronAPI(cronSvc)
 	rdAPI := api.NewRemoteDesktopAPI(rdSvc)
 
-	// 前端兼容 API 适配器
-	compatAPI := api.NewCompatAPI(userSvc, hostSvc, roleSvc, identitySvc, groupSvc, systemSvc)
-
 	// 启动定时任务
 	cronSvc.StartAllJobs()
 
@@ -105,147 +101,8 @@ func main() {
 	// CORS
 	r.Use(corsMiddleware())
 
-	// ============================================
-	// 前端兼容路由 (匹配 orion-visor-ui 的 API 路径)
-	// 前端 baseURL = /orion-visor/api
-	// ============================================
-	apiBase := r.Group("/orion-visor/api")
-
 	// 公开接口
 	r.POST("/api/auth/login", authAPI.Login)
-	apiBase.POST("/infra/auth/login", compatAPI.Login)
-	apiBase.GET("/infra/auth/logout", compatAPI.Logout)
-
-	// 前端认证路由
-	compat := apiBase.Group("", middleware.JWTAuth())
-	{
-		// 用户聚合信息
-		compat.GET("/infra/user-aggregate/user", compatAPI.GetUserAggregate)
-		compat.GET("/infra/user-aggregate/menu", compatAPI.GetUserMenu)
-
-		// 个人中心
-		compat.GET("/infra/mine/get-user", compatAPI.GetCurrentUserInfo)
-		compat.PUT("/infra/mine/update-user", compatAPI.GetCurrentUserInfo)
-		compat.PUT("/infra/mine/update-password", compatAPI.UpdateCurrentUserPassword)
-		compat.GET("/infra/mine/login-history", func(c *gin.Context) { response.OK(c, []interface{}{}) })
-		compat.GET("/infra/mine/user-session", func(c *gin.Context) { response.OK(c, []interface{}{}) })
-		compat.POST("/infra/mine/query-operator-log", func(c *gin.Context) {
-			response.OKPage(c, 0, []interface{}{})
-		})
-
-		// 消息
-		compat.GET("/infra/system-message/has-unread", compatAPI.HasUnreadMessage)
-		compat.GET("/infra/system-message/count", compatAPI.GetMessageCount)
-		compat.POST("/infra/system-message/list", func(c *gin.Context) { response.OK(c, []interface{}{}) })
-
-		// 用户管理
-		compat.POST("/infra/system-user/query", compatAPI.QueryUsers)
-		compat.GET("/infra/system-user/list", compatAPI.ListSystemUsers)
-
-		// 角色管理
-		compat.GET("/infra/system-role/list", compatAPI.ListSystemRoles)
-
-		// 菜单管理
-		compat.POST("/infra/system-menu/list", func(c *gin.Context) {
-			menus, _ := roleSvc.GetMenuList()
-			response.OK(c, menus)
-		})
-		compat.PUT("/infra/system-menu/refresh-cache", func(c *gin.Context) { response.OK(c, nil) })
-
-		// 主机管理
-		compat.POST("/asset/host/create", compatAPI.CreateHost)
-		compat.PUT("/asset/host/update", compatAPI.UpdateHost)
-		compat.PUT("/asset/host/update-status", compatAPI.UpdateHostStatus)
-		compat.PUT("/asset/host/update-spec", func(c *gin.Context) { response.OK(c, nil) })
-		compat.GET("/asset/host/get", compatAPI.GetHost)
-		compat.GET("/asset/host/list", compatAPI.ListHosts)
-		compat.POST("/asset/host/query", compatAPI.QueryHosts)
-		compat.POST("/asset/host/count", func(c *gin.Context) { response.OK(c, 0) })
-		compat.DELETE("/asset/host/delete", compatAPI.DeleteHost)
-		compat.DELETE("/asset/host/batch-delete", compatAPI.BatchDeleteHost)
-		compat.POST("/asset/host/test-connect", func(c *gin.Context) { response.OK(c, nil) })
-
-		// 主机凭证
-		compat.POST("/asset/host-identity/create", compatAPI.CreateHostIdentity)
-		compat.PUT("/asset/host-identity/update", compatAPI.UpdateHostIdentity)
-		compat.GET("/asset/host-identity/get", compatAPI.GetHostIdentity)
-		compat.POST("/asset/host-identity/query", compatAPI.QueryHostIdentities)
-		compat.GET("/asset/host-identity/list", compatAPI.ListHostIdentities)
-		compat.DELETE("/asset/host-identity/delete", compatAPI.DeleteHostIdentity)
-
-		// 主机密钥
-		compat.GET("/asset/host-key/list", func(c *gin.Context) { response.OK(c, []interface{}{}) })
-		compat.POST("/asset/host-key/query", func(c *gin.Context) { response.OKPage(c, 0, []interface{}{}) })
-
-		// 主机配置
-		compat.GET("/asset/host-config/get", compatAPI.GetHostConfig)
-		compat.PUT("/asset/host-config/update", compatAPI.UpdateHostConfig)
-		compat.GET("/asset/host-extra/get", compatAPI.GetHostExtra)
-		compat.PUT("/asset/host-extra/update", compatAPI.UpdateHostExtra)
-
-		// 主机分组
-		compat.GET("/asset/host-group/tree", compatAPI.GetHostGroupTree)
-		compat.POST("/asset/host-group/create", compatAPI.CreateHostGroup)
-		compat.PUT("/asset/host-group/rename", compatAPI.RenameHostGroup)
-		compat.DELETE("/asset/host-group/delete", compatAPI.DeleteHostGroup)
-		compat.GET("/asset/host-group/rel-list", compatAPI.GetHostGroupRelList)
-		compat.PUT("/asset/host-group/update-rel", compatAPI.UpdateHostGroupRel)
-
-		// 授权数据
-		compat.GET("/asset/authorized-data/current-host", compatAPI.GetCurrentAuthorizedHosts)
-		compat.GET("/asset/authorized-data/current-host-identity", compatAPI.ListHostIdentities)
-		compat.GET("/asset/authorized-data/current-host-key", func(c *gin.Context) { response.OK(c, []interface{}{}) })
-
-		// 数据授权
-		compat.GET("/asset/data-grant/get-host-group", func(c *gin.Context) { response.OK(c, nil) })
-		compat.GET("/asset/data-grant/get-host-identity", func(c *gin.Context) { response.OK(c, nil) })
-		compat.GET("/asset/data-grant/get-host-key", func(c *gin.Context) { response.OK(c, nil) })
-
-		// 终端
-		compat.POST("/terminal/terminal/access", compatAPI.TerminalAccess)
-		compat.GET("/terminal/terminal/themes", compatAPI.GetTerminalThemes)
-		compat.POST("/terminal/terminal/transfer", func(c *gin.Context) { response.OK(c, nil) })
-
-		// 命令片段
-		compat.GET("/terminal/command-snippet-group/list", compatAPI.ListCommandSnippetGroups)
-		compat.GET("/terminal/command-snippet/list", func(c *gin.Context) {
-			response.OK(c, []interface{}{})
-		})
-
-		// 路径书签
-		compat.GET("/terminal/path-bookmark-group/list", func(c *gin.Context) { response.OK(c, []interface{}{}) })
-		compat.GET("/terminal/path-bookmark/list", func(c *gin.Context) { response.OK(c, []interface{}{}) })
-
-		// 连接日志
-		compat.POST("/terminal/terminal-connect-log/query", func(c *gin.Context) { response.OKPage(c, 0, []interface{}{}) })
-		compat.POST("/terminal/terminal-connect-log/latest-connect", compatAPI.GetLatestConnectHostIds)
-		compat.GET("/terminal/terminal-connect-log/sessions", func(c *gin.Context) { response.OK(c, []interface{}{}) })
-
-		// SFTP 日志
-		compat.POST("/terminal/terminal-file-log/query", func(c *gin.Context) { response.OKPage(c, 0, []interface{}{}) })
-
-		// 统计
-		compat.GET("/terminal/statistics/get-workplace", compatAPI.GetTerminalWorkplaceStatistics)
-		compat.GET("/infra/statistics/get-workplace", compatAPI.GetInfraWorkplaceStatistics)
-		compat.GET("/exec/statistics/get-workplace", compatAPI.GetExecWorkplaceStatistics)
-
-		// 批量执行
-		compat.POST("/exec/exec-command/exec", func(c *gin.Context) { response.OK(c, nil) })
-		compat.POST("/exec/exec-command-log/query", func(c *gin.Context) { response.OKPage(c, 0, []interface{}{}) })
-		compat.POST("/exec/exec-job-log/query", func(c *gin.Context) { response.OKPage(c, 0, []interface{}{}) })
-
-		// 用户偏好
-		compat.GET("/infra/preference/get", compatAPI.GetPreference)
-		compat.GET("/infra/preference/get-default", compatAPI.GetDefaultPreference)
-		compat.PUT("/infra/preference/update", compatAPI.UpdatePreference)
-		compat.PUT("/infra/preference/update-batch", compatAPI.UpdatePreferenceBatch)
-
-		// 字典 (前端启动时加载)
-		compat.GET("/infra/dict-value/list", compatAPI.GetDictValueList)
-		compat.POST("/infra/dict-key/list", func(c *gin.Context) { response.OK(c, []interface{}{}) })
-		compat.POST("/infra/dict-key/query", func(c *gin.Context) { response.OKPage(c, 0, []interface{}{}) })
-		compat.POST("/infra/dict-value/query", func(c *gin.Context) { response.OKPage(c, 0, []interface{}{}) })
-	}
 
 	// 需要认证的接口
 	auth := r.Group("/api", middleware.JWTAuth())
@@ -454,25 +311,6 @@ func main() {
 		}
 		wsGroup.GET("/rdp/:hostId", ws.HandleRDPWS(rdDeps))
 		wsGroup.GET("/vnc/:hostId", ws.HandleVNCWS(rdDeps))
-	}
-
-	// 前端兼容 WebSocket 路由
-	// 前端 WS baseURL = /orion-visor/keep-alive
-	// 终端: /terminal/access/:protocol/:accessToken (accessToken 即 JWT)
-	termDeps := &ws.TerminalDeps{
-		GetSSHConfig: getSSHConfig,
-		SessionSvc:   sessionSvc,
-		HostName: func(hostID int64) (string, string) {
-			host, err := hostSvc.GetByID(hostID)
-			if err != nil {
-				return "", ""
-			}
-			return host.Name, host.Address
-		},
-	}
-	compatWS := r.Group("/orion-visor/keep-alive")
-	{
-		compatWS.GET("/terminal/access/:protocol/:accessToken", ws.HandleCompatTerminalWS(termDeps, hostSvc))
 	}
 
 	// 启动服务
