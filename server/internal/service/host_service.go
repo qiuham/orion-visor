@@ -29,6 +29,9 @@ func (s *HostService) List(req *model.HostListRequest) ([]model.Host, int64, err
 	if req.Status != nil {
 		q = q.Where("status = ?", *req.Status)
 	}
+	if req.GroupID != nil {
+		q = q.Where("id IN (SELECT host_id FROM asset_host_group_rel WHERE group_id = ?)", *req.GroupID)
+	}
 	q.Count(&total)
 
 	offset := (req.Page - 1) * req.PageSize

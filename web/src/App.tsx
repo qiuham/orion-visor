@@ -3,6 +3,7 @@ import { useAuthStore } from '@/store/auth';
 import BasicLayout from '@/layouts/BasicLayout';
 import LoginPage from '@/pages/login';
 import Dashboard from '@/pages/dashboard';
+import HostPage from '@/pages/asset/host';
 
 // 路由守卫
 const RequireAuth = ({ children }: { children: React.ReactNode }) => {
@@ -26,9 +27,8 @@ const App = () => {
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
         {/* 资产管理 */}
-        <Route path="asset/host" element={<PlaceholderPage title="主机列表" />} />
+        <Route path="asset/host" element={<HostPage />} />
         <Route path="asset/identity" element={<PlaceholderPage title="主机凭据" />} />
-        <Route path="asset/group" element={<PlaceholderPage title="主机分组" />} />
         <Route path="asset/grant" element={<PlaceholderPage title="资产授权" />} />
         {/* 终端 */}
         <Route path="terminal" element={<PlaceholderPage title="终端" />} />

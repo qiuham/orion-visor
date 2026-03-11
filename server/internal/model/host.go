@@ -62,6 +62,7 @@ type HostListRequest struct {
 	Name     string `form:"name"`
 	Type     string `form:"type"`
 	Status   *int8  `form:"status"`
+	GroupID  *int64 `form:"groupId"`
 }
 
 type HostCreateRequest struct {

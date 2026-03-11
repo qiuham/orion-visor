@@ -25,9 +25,8 @@ const menuData: MenuDataItem[] = [
     name: '资产管理',
     icon: <CloudServerOutlined />,
     children: [
-      { path: '/asset/host', name: '主机列表' },
+      { path: '/asset/host', name: '主机管理' },
       { path: '/asset/identity', name: '主机凭据' },
-      { path: '/asset/group', name: '主机分组' },
       { path: '/asset/grant', name: '资产授权' },
     ],
   },
