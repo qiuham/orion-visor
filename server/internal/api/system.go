@@ -109,3 +109,14 @@ func (a *SystemAPI) DeleteDictValue(c *gin.Context) {
 	}
 	response.OK(c, nil)
 }
+
+// --- 统计概览 ---
+
+func (a *SystemAPI) GetStats(c *gin.Context) {
+	response.OK(c, gin.H{
+		"hostCount":       a.systemSvc.CountHosts(),
+		"userCount":       a.systemSvc.CountUsers(),
+		"sessionCount":    a.systemSvc.CountTerminalSessions(),
+		"todayOperations": a.systemSvc.CountTodayOperations(),
+	})
+}

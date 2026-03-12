@@ -61,6 +61,7 @@ const menuData: MenuDataItem[] = [
     children: [
       { path: '/audit/operation', name: '操作日志' },
       { path: '/audit/connect', name: '连接日志' },
+      { path: '/audit/session', name: '终端录屏' },
     ],
   },
   {

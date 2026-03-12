@@ -220,3 +220,9 @@ func (s *SystemService) CountTerminalSessions() int64 {
 	s.db.Model(&model.TerminalSession{}).Count(&count)
 	return count
 }
+
+func (s *SystemService) CountTodayOperations() int64 {
+	var count int64
+	s.db.Model(&model.OperationLog{}).Where("DATE(created_at) = CURDATE()").Count(&count)
+	return count
+}

@@ -5,6 +5,7 @@ import LoginPage from '@/pages/login';
 import Dashboard from '@/pages/dashboard';
 import HostPage from '@/pages/asset/host';
 import IdentityPage from '@/pages/asset/identity';
+import AssetGrantPage from '@/pages/asset/grant';
 import TerminalPage from '@/pages/terminal';
 import ExecCommandPage from '@/pages/exec/command';
 import ExecLogPage from '@/pages/exec/log';
@@ -13,6 +14,7 @@ import UserListPage from '@/pages/user/list';
 import RolePage from '@/pages/user/role';
 import OperationLogPage from '@/pages/audit/operation';
 import ConnectLogPage from '@/pages/audit/connect';
+import TerminalSessionPage from '@/pages/audit/session';
 import SystemSettingPage from '@/pages/system/setting';
 import MenuPage from '@/pages/system/menu';
 import DictPage from '@/pages/system/dict';
@@ -41,7 +43,7 @@ const App = () => {
         {/* 资产管理 */}
         <Route path="asset/host" element={<HostPage />} />
         <Route path="asset/identity" element={<IdentityPage />} />
-        <Route path="asset/grant" element={<PlaceholderPage title="资产授权" />} />
+        <Route path="asset/grant" element={<AssetGrantPage />} />
         {/* 终端 */}
         <Route path="terminal" element={<TerminalPage />} />
         {/* 批量执行 */}
@@ -54,6 +56,7 @@ const App = () => {
         {/* 审计 */}
         <Route path="audit/operation" element={<OperationLogPage />} />
         <Route path="audit/connect" element={<ConnectLogPage />} />
+        <Route path="audit/session" element={<TerminalSessionPage />} />
         {/* 系统 */}
         <Route path="system/setting" element={<SystemSettingPage />} />
         <Route path="system/menu" element={<MenuPage />} />
@@ -63,13 +66,5 @@ const App = () => {
     </Routes>
   );
 };
-
-// 仅剩资产授权页面暂未实现
-const PlaceholderPage = ({ title }: { title: string }) => (
-  <div style={{ padding: 24 }}>
-    <h2>{title}</h2>
-    <p style={{ color: '#999' }}>页面开发中...</p>
-  </div>
-);
 
 export default App;

@@ -237,6 +237,9 @@ func main() {
 				middleware.AuditLog("terminalSession", "delete", 2), termSessionAPI.Delete)
 		}
 
+		// 统计概览
+		auth.GET("/stats", systemAPI.GetStats)
+
 		// 系统配置
 		system := auth.Group("/system")
 		{

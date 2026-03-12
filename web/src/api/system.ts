@@ -54,3 +54,15 @@ export function createDictValue(data: Partial<DictValue>) {
 export function deleteDictValue(id: number) {
   return request.delete(`/dict/value/${id}`);
 }
+
+// 统计概览
+export interface DashboardStats {
+  hostCount: number;
+  userCount: number;
+  sessionCount: number;
+  todayOperations: number;
+}
+
+export function getDashboardStats() {
+  return request.get<any, DashboardStats>('/stats');
+}
