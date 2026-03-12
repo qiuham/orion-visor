@@ -6,6 +6,7 @@ import Dashboard from '@/pages/dashboard';
 import HostPage from '@/pages/asset/host';
 import IdentityPage from '@/pages/asset/identity';
 import AssetGrantPage from '@/pages/asset/grant';
+import TagPage from '@/pages/asset/tag';
 import TerminalPage from '@/pages/terminal';
 import ExecCommandPage from '@/pages/exec/command';
 import ExecLogPage from '@/pages/exec/log';
@@ -44,6 +45,7 @@ const App = () => {
         <Route path="asset/host" element={<HostPage />} />
         <Route path="asset/identity" element={<IdentityPage />} />
         <Route path="asset/grant" element={<AssetGrantPage />} />
+        <Route path="asset/tag" element={<TagPage />} />
         {/* 终端 */}
         <Route path="terminal" element={<TerminalPage />} />
         {/* 批量执行 */}

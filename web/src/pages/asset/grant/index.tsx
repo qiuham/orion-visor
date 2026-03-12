@@ -1,15 +1,10 @@
 import { useState, useEffect } from 'react';
 import { PageContainer } from '@ant-design/pro-components';
-import { Card, Transfer, Button, Select, message, Space, Tag, Empty } from 'antd';
+import { Card, Transfer, Button, Select, message, Space, Empty } from 'antd';
 import { getHostList, type Host } from '@/api/host';
 import { getUserList, type User } from '@/api/user';
 import { getRoleList, type Role } from '@/api/role';
-
-/**
- * 资产授权页面
- * 将主机分配给用户或角色，控制谁可以访问哪些主机
- * 注意：Go 后端尚未实现数据授权 API，此页面为前端预置，后续对接
- */
+import { getGrantedHosts, updateGrant } from '@/api/grant';
 
 type GrantType = 'user' | 'role';
 
@@ -34,10 +29,14 @@ const AssetGrantPage = () => {
     });
   }, []);
 
-  const handleTargetChange = (id: number) => {
+  const handleTargetChange = async (id: number) => {
     setSelectedTarget(id);
-    // TODO: 后端实现后调用 getGrantedHosts(grantType, id)
-    setTargetKeys([]);
+    try {
+      const hostIds = await getGrantedHosts(grantType, id);
+      setTargetKeys((hostIds || []).map(String));
+    } catch {
+      setTargetKeys([]);
+    }
   };
 
   const handleSave = async () => {
@@ -47,8 +46,14 @@ const AssetGrantPage = () => {
     }
     setLoading(true);
     try {
-      // TODO: 后端实现后调用 saveGrant(grantType, selectedTarget, targetKeys)
-      message.info('资产授权 API 尚在开发中，当前为预览界面');
+      await updateGrant({
+        grantType,
+        grantId: selectedTarget,
+        hostIds: targetKeys.map(Number),
+      });
+      message.success('授权保存成功');
+    } catch {
+      message.error('保存失败');
     } finally {
       setLoading(false);
     }
@@ -95,10 +100,6 @@ const AssetGrantPage = () => {
             保存授权
           </Button>
         </Space>
-
-        <Tag color="orange" style={{ marginBottom: 16 }}>
-          提示：后端数据授权 API 开发中，当前为界面预览
-        </Tag>
 
         {selectedTarget ? (
           <Transfer

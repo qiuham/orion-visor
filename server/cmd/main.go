@@ -43,6 +43,10 @@ func main() {
 	sessionSvc := service.NewTerminalSessionService(db)
 	systemSvc := service.NewSystemService(db)
 	rdSvc := service.NewRemoteDesktopService(db, hostSvc, identitySvc)
+	grantSvc := service.NewGrantService(db)
+	tagSvc := service.NewTagService(db)
+	notifSvc := service.NewNotificationService(db)
+	prefSvc := service.NewPreferenceService(db)
 
 	// 获取 SSH 配置的辅助函数（集成凭证管理）
 	getSSHConfig := func(hostID int64) (*internalssh.ConnectConfig, error) {
@@ -90,6 +94,10 @@ func main() {
 	systemAPI := api.NewSystemAPI(systemSvc)
 	cronAPI := api.NewCronAPI(cronSvc)
 	rdAPI := api.NewRemoteDesktopAPI(rdSvc)
+	grantAPI := api.NewGrantAPI(grantSvc)
+	tagAPI := api.NewTagAPI(tagSvc)
+	notifAPI := api.NewNotificationAPI(notifSvc)
+	prefAPI := api.NewPreferenceAPI(prefSvc)
 
 	// 启动定时任务
 	cronSvc.StartAllJobs()
@@ -280,6 +288,50 @@ func main() {
 			audit.GET("/operation-log", middleware.RequirePermission("audit:query"), auditAPI.ListOperationLogs)
 			audit.GET("/connect-log", middleware.RequirePermission("audit:query"), auditAPI.ListConnectLogs)
 		}
+
+		// 资产授权
+		grant := auth.Group("/asset-grant")
+		{
+			grant.GET("", middleware.RequirePermission("grant:query"), grantAPI.GetGrantedHosts)
+			grant.PUT("", middleware.RequirePermission("grant:update"),
+				middleware.AuditLog("grant", "update", 2), grantAPI.UpdateGrant)
+			grant.GET("/user/:userId/hosts", middleware.RequirePermission("grant:query"), grantAPI.GetUserAccessibleHosts)
+		}
+
+		// 标签管理
+		tags := auth.Group("/tag")
+		{
+			tags.GET("", tagAPI.List)
+			tags.POST("", middleware.RequirePermission("tag:create"), tagAPI.Create)
+			tags.DELETE("/:id", middleware.RequirePermission("tag:delete"), tagAPI.Delete)
+		}
+
+		// 通知消息
+		notif := auth.Group("/notification")
+		{
+			notif.GET("", notifAPI.List)
+			notif.POST("", middleware.RequirePermission("notification:create"), notifAPI.Create)
+			notif.GET("/unread-count", notifAPI.CountUnread)
+			notif.PUT("/:id/read", notifAPI.MarkRead)
+			notif.PUT("/read-all", notifAPI.MarkAllRead)
+			notif.DELETE("/:id", notifAPI.Delete)
+		}
+
+		// 用户偏好
+		pref := auth.Group("/preference")
+		{
+			pref.GET("", prefAPI.GetPreferences)
+			pref.PUT("", prefAPI.SetPreference)
+			pref.DELETE("", prefAPI.DeletePreference)
+		}
+
+		// 收藏
+		fav := auth.Group("/favorite")
+		{
+			fav.GET("", prefAPI.ListFavorites)
+			fav.POST("", prefAPI.AddFavorite)
+			fav.DELETE("", prefAPI.RemoveFavorite)
+		}
 	}
 
 	// WebSocket 接口（需要 token 参数认证）
@@ -375,6 +427,10 @@ func autoMigrate(db *gorm.DB) {
 		&model.CronJobLog{},
 		&model.UserPreference{},
 		&model.HostExtra{},
+		&model.AssetGrant{},
+		&model.Tag{},
+		&model.Notification{},
+		&model.Favorite{},
 	)
 	log.Println("数据库迁移完成")
 }
