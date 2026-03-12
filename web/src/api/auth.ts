@@ -38,3 +38,7 @@ export function getPermissions(): Promise<string[]> {
 export function updatePassword(oldPassword: string, newPassword: string) {
   return request.put('/user/current/password', { oldPassword, newPassword });
 }
+
+export function logout() {
+  return request.post('/auth/logout');
+}

@@ -16,6 +16,7 @@ import type { MenuDataItem } from '@ant-design/pro-components';
 import { Badge, Dropdown, message, Popover, List, Button, Tag, Space } from 'antd';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/auth';
+import { logout as apiLogout } from '@/api/auth';
 import { getUnreadCount, getNotifications, markAllRead, markRead, type Notification } from '@/api/notification';
 
 const menuData: MenuDataItem[] = [
@@ -33,6 +34,7 @@ const menuData: MenuDataItem[] = [
       { path: '/asset/identity', name: '主机凭据' },
       { path: '/asset/grant', name: '资产授权' },
       { path: '/asset/tag', name: '标签管理' },
+      { path: '/asset/sftp', name: '文件管理' },
     ],
   },
   {
@@ -51,6 +53,7 @@ const menuData: MenuDataItem[] = [
     icon: <CodeOutlined />,
     children: [
       { path: '/exec/command', name: '命令执行' },
+      { path: '/exec/snippet', name: '命令片段' },
       { path: '/exec/log', name: '执行日志' },
       { path: '/exec/cron', name: '定时任务' },
     ],
@@ -138,7 +141,8 @@ const BasicLayout = () => {
     loadNotifications();
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try { await apiLogout(); } catch { /* ignore */ }
     logout();
     message.success('已退出登录');
     navigate('/login');

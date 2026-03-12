@@ -21,6 +21,8 @@ import SystemSettingPage from '@/pages/system/setting';
 import MenuPage from '@/pages/system/menu';
 import DictPage from '@/pages/system/dict';
 import StatsPage from '@/pages/system/stats';
+import SftpPage from '@/pages/asset/sftp';
+import SnippetPage from '@/pages/exec/snippet';
 
 // 路由守卫
 const RequireAuth = ({ children }: { children: React.ReactNode }) => {
@@ -48,12 +50,14 @@ const App = () => {
         <Route path="asset/identity" element={<IdentityPage />} />
         <Route path="asset/grant" element={<AssetGrantPage />} />
         <Route path="asset/tag" element={<TagPage />} />
+        <Route path="asset/sftp" element={<SftpPage />} />
         {/* 终端 */}
         <Route path="terminal" element={<TerminalPage />} />
         {/* 监控 */}
         <Route path="monitor" element={<MonitorPage />} />
         {/* 批量执行 */}
         <Route path="exec/command" element={<ExecCommandPage />} />
+        <Route path="exec/snippet" element={<SnippetPage />} />
         <Route path="exec/log" element={<ExecLogPage />} />
         <Route path="exec/cron" element={<CronPage />} />
         {/* 用户管理 */}
