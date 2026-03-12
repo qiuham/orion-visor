@@ -8,6 +8,7 @@ import IdentityPage from '@/pages/asset/identity';
 import AssetGrantPage from '@/pages/asset/grant';
 import TagPage from '@/pages/asset/tag';
 import TerminalPage from '@/pages/terminal';
+import MonitorPage from '@/pages/monitor';
 import ExecCommandPage from '@/pages/exec/command';
 import ExecLogPage from '@/pages/exec/log';
 import CronPage from '@/pages/exec/cron';
@@ -19,6 +20,7 @@ import TerminalSessionPage from '@/pages/audit/session';
 import SystemSettingPage from '@/pages/system/setting';
 import MenuPage from '@/pages/system/menu';
 import DictPage from '@/pages/system/dict';
+import StatsPage from '@/pages/system/stats';
 
 // 路由守卫
 const RequireAuth = ({ children }: { children: React.ReactNode }) => {
@@ -48,6 +50,8 @@ const App = () => {
         <Route path="asset/tag" element={<TagPage />} />
         {/* 终端 */}
         <Route path="terminal" element={<TerminalPage />} />
+        {/* 监控 */}
+        <Route path="monitor" element={<MonitorPage />} />
         {/* 批量执行 */}
         <Route path="exec/command" element={<ExecCommandPage />} />
         <Route path="exec/log" element={<ExecLogPage />} />
@@ -63,6 +67,7 @@ const App = () => {
         <Route path="system/setting" element={<SystemSettingPage />} />
         <Route path="system/menu" element={<MenuPage />} />
         <Route path="system/dict" element={<DictPage />} />
+        <Route path="system/stats" element={<StatsPage />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Route>
     </Routes>

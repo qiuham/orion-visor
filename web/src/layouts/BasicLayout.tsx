@@ -6,6 +6,7 @@ import {
   DashboardOutlined,
   DesktopOutlined,
   FileSearchOutlined,
+  FundOutlined,
   LogoutOutlined,
   SettingOutlined,
   TeamOutlined,
@@ -38,6 +39,11 @@ const menuData: MenuDataItem[] = [
     path: '/terminal',
     name: '终端',
     icon: <DesktopOutlined />,
+  },
+  {
+    path: '/monitor',
+    name: '主机监控',
+    icon: <FundOutlined />,
   },
   {
     path: '/exec',
@@ -76,6 +82,7 @@ const menuData: MenuDataItem[] = [
       { path: '/system/setting', name: '系统配置' },
       { path: '/system/menu', name: '菜单管理' },
       { path: '/system/dict', name: '字典管理' },
+      { path: '/system/stats', name: '统计报表' },
     ],
   },
 ];

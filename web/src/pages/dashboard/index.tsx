@@ -47,7 +47,7 @@ const Dashboard = () => {
         setRecentLogs(logs.rows || []);
         setRecentJobs(jobs.rows || []);
       } catch {
-        setStats({ hostCount: 0, userCount: 0, sessionCount: 0, todayOperations: 0 });
+        setStats({ hostCount: 0, userCount: 0, sessionCount: 0, todayOperations: 0, execJobCount: 0, cronJobCount: 0 });
       } finally {
         setLoading(false);
       }

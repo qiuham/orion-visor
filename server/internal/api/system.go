@@ -118,5 +118,25 @@ func (a *SystemAPI) GetStats(c *gin.Context) {
 		"userCount":       a.systemSvc.CountUsers(),
 		"sessionCount":    a.systemSvc.CountTerminalSessions(),
 		"todayOperations": a.systemSvc.CountTodayOperations(),
+		"execJobCount":    a.systemSvc.CountExecJobs(),
+		"cronJobCount":    a.systemSvc.CountCronJobs(),
+	})
+}
+
+// GetStatsTrend 趋势统计
+func (a *SystemAPI) GetStatsTrend(c *gin.Context) {
+	days := 14
+	if d := c.Query("days"); d != "" {
+		if v, err := strconv.Atoi(d); err == nil && v > 0 && v <= 90 {
+			days = v
+		}
+	}
+	response.OK(c, gin.H{
+		"connectionTrend":  a.systemSvc.GetConnectionTrend(days),
+		"operationTrend":   a.systemSvc.GetOperationTrend(days),
+		"execTrend":        a.systemSvc.GetExecTrend(days),
+		"operationByModule": a.systemSvc.GetOperationByModule(),
+		"hostByType":       a.systemSvc.GetHostByType(),
+		"connectionByType": a.systemSvc.GetConnectionByType(),
 	})
 }

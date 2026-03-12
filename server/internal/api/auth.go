@@ -52,3 +52,10 @@ func (a *AuthAPI) GetCurrentUser(c *gin.Context) {
 	}
 	response.OK(c, user)
 }
+
+// Logout 退出登录
+func (a *AuthAPI) Logout(c *gin.Context) {
+	// JWT 是无状态的，服务端无需操作
+	// 如果后续需要 token 黑名单，可在此处添加
+	response.OK(c, nil)
+}

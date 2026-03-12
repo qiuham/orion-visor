@@ -113,6 +113,8 @@ func main() {
 	r.POST("/api/auth/login", authAPI.Login)
 
 	// 需要认证的接口
+	// 登出 (需要认证)
+	r.POST("/api/auth/logout", middleware.JWTAuth(), authAPI.Logout)
 	auth := r.Group("/api", middleware.JWTAuth())
 	{
 		// 当前用户
@@ -247,6 +249,7 @@ func main() {
 
 		// 统计概览
 		auth.GET("/stats", systemAPI.GetStats)
+		auth.GET("/stats/trend", systemAPI.GetStatsTrend)
 
 		// 系统配置
 		system := auth.Group("/system")

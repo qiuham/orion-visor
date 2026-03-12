@@ -61,8 +61,33 @@ export interface DashboardStats {
   userCount: number;
   sessionCount: number;
   todayOperations: number;
+  execJobCount: number;
+  cronJobCount: number;
 }
 
 export function getDashboardStats() {
   return request.get<any, DashboardStats>('/stats');
+}
+
+export interface DailyCount {
+  date: string;
+  count: number;
+}
+
+export interface ModuleCount {
+  module: string;
+  count: number;
+}
+
+export interface StatsTrend {
+  connectionTrend: DailyCount[];
+  operationTrend: DailyCount[];
+  execTrend: DailyCount[];
+  operationByModule: ModuleCount[];
+  hostByType: ModuleCount[];
+  connectionByType: ModuleCount[];
+}
+
+export function getStatsTrend(days?: number) {
+  return request.get<any, StatsTrend>('/stats/trend', { params: { days } });
 }

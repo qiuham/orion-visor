@@ -226,3 +226,104 @@ func (s *SystemService) CountTodayOperations() int64 {
 	s.db.Model(&model.OperationLog{}).Where("DATE(created_at) = CURDATE()").Count(&count)
 	return count
 }
+
+// --- 趋势统计 ---
+
+type DailyCount struct {
+	Date  string `json:"date"`
+	Count int64  `json:"count"`
+}
+
+// GetConnectionTrend 最近 N 天的连接数趋势
+func (s *SystemService) GetConnectionTrend(days int) []DailyCount {
+	var results []DailyCount
+	s.db.Raw(`
+		SELECT DATE(created_at) as date, COUNT(*) as count
+		FROM connect_log
+		WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+		GROUP BY DATE(created_at)
+		ORDER BY date
+	`, days).Scan(&results)
+	return results
+}
+
+// GetOperationTrend 最近 N 天的操作数趋势
+func (s *SystemService) GetOperationTrend(days int) []DailyCount {
+	var results []DailyCount
+	s.db.Raw(`
+		SELECT DATE(created_at) as date, COUNT(*) as count
+		FROM operation_log
+		WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+		GROUP BY DATE(created_at)
+		ORDER BY date
+	`, days).Scan(&results)
+	return results
+}
+
+// GetExecTrend 最近 N 天的执行任务趋势
+func (s *SystemService) GetExecTrend(days int) []DailyCount {
+	var results []DailyCount
+	s.db.Raw(`
+		SELECT DATE(created_at) as date, COUNT(*) as count
+		FROM exec_job
+		WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+		GROUP BY DATE(created_at)
+		ORDER BY date
+	`, days).Scan(&results)
+	return results
+}
+
+type ModuleCount struct {
+	Module string `json:"module"`
+	Count  int64  `json:"count"`
+}
+
+// GetOperationByModule 按模块统计操作数
+func (s *SystemService) GetOperationByModule() []ModuleCount {
+	var results []ModuleCount
+	s.db.Raw(`
+		SELECT module, COUNT(*) as count
+		FROM operation_log
+		GROUP BY module
+		ORDER BY count DESC
+	`).Scan(&results)
+	return results
+}
+
+// GetHostByType 按类型统计主机数
+func (s *SystemService) GetHostByType() []ModuleCount {
+	var results []ModuleCount
+	s.db.Raw(`
+		SELECT type as module, COUNT(*) as count
+		FROM asset_host
+		GROUP BY type
+		ORDER BY count DESC
+	`).Scan(&results)
+	return results
+}
+
+// GetConnectionByType 按协议统计连接数
+func (s *SystemService) GetConnectionByType() []ModuleCount {
+	var results []ModuleCount
+	s.db.Raw(`
+		SELECT type as module, COUNT(*) as count
+		FROM connect_log
+		GROUP BY type
+		ORDER BY count DESC
+	`).Scan(&results)
+	return results
+}
+
+// CountExecJobs 执行任务总数
+func (s *SystemService) CountExecJobs() int64 {
+	var count int64
+	s.db.Model(&model.ExecJob{}).Count(&count)
+	return count
+}
+
+// CountCronJobs 定时任务数
+func (s *SystemService) CountCronJobs() int64 {
+	var count int64
+	s.db.Model(&model.CronJob{}).Count(&count)
+	return count
+}
