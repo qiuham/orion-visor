@@ -9,17 +9,17 @@ import CommandSnippetDrawer from './components/CommandSnippetDrawer';
 import './terminal.css';
 
 const TerminalPage: React.FC = () => {
-  const { fullscreen, toggleFullscreen, theme, setCommandBarVisible, commandBarVisible } =
+  const { fullscreen, toggleFullscreen, uiTheme, setCommandBarVisible, commandBarVisible } =
     useTerminalStore();
   const [snippetDrawerOpen, setSnippetDrawerOpen] = useState(false);
 
   // Apply theme attribute to body
   useEffect(() => {
-    document.body.setAttribute('data-terminal-theme', theme);
+    document.body.setAttribute('data-terminal-theme', uiTheme);
     return () => {
       document.body.removeAttribute('data-terminal-theme');
     };
-  }, [theme]);
+  }, [uiTheme]);
 
   // Warn before unload if sessions active
   useEffect(() => {

@@ -10,6 +10,8 @@ import {
   SessionTypeColors,
   generateKey,
 } from './types';
+import { loadPreferences, savePreferences, addLatestHost } from './preferences';
+import { getThemeByName } from './themes';
 
 // ============ Session Instance (not in store - mutable refs) ============
 
@@ -42,11 +44,17 @@ interface TerminalState {
   // Panels (terminal panels within tabs)
   panels: TerminalPanelState[];
 
-  // Layout
-  theme: 'light' | 'dark';
+  // Layout & preferences
+  uiTheme: 'light' | 'dark';
+  terminalThemeName: string;
   fullscreen: boolean;
   commandBarVisible: boolean;
   commandBarText: string;
+  fontSize: number;
+  fontFamily: string;
+  cursorStyle: 'block' | 'underline' | 'bar';
+  cursorBlink: boolean;
+  scrollback: number;
 
   // Actions
   addTab: (tab: TerminalTabItem) => void;
@@ -59,10 +67,19 @@ interface TerminalState {
   setActiveSession: (panelKey: string, sessionKey: string) => void;
   updateSessionStatus: (sessionKey: string, status: TerminalConnectStatus) => void;
 
-  setTheme: (theme: 'light' | 'dark') => void;
+  setUiTheme: (theme: 'light' | 'dark') => void;
+  setTerminalTheme: (name: string) => void;
+  setFontSize: (size: number) => void;
+  setFontFamily: (family: string) => void;
+  setCursorStyle: (style: 'block' | 'underline' | 'bar') => void;
+  setCursorBlink: (blink: boolean) => void;
+  setScrollback: (lines: number) => void;
   toggleFullscreen: () => void;
   setCommandBarVisible: (visible: boolean) => void;
   setCommandBarText: (text: string) => void;
+
+  // Apply preferences to all active terminals
+  applyPreferencesToTerminals: () => void;
 }
 
 // Default "New Connection" tab
@@ -74,18 +91,26 @@ const defaultTab: TerminalTabItem = {
   closable: false,
 };
 
+// Load initial preferences
+const initPrefs = loadPreferences();
+
 export const useTerminalStore = create<TerminalState>((set, get) => ({
   tabs: [defaultTab],
   activeTabKey: 'new-connection',
   panels: [],
-  theme: 'light',
+  uiTheme: initPrefs.uiTheme,
+  terminalThemeName: initPrefs.terminalThemeName,
   fullscreen: false,
   commandBarVisible: false,
   commandBarText: '',
+  fontSize: initPrefs.fontSize,
+  fontFamily: initPrefs.fontFamily,
+  cursorStyle: initPrefs.cursorStyle,
+  cursorBlink: initPrefs.cursorBlink,
+  scrollback: initPrefs.scrollback,
 
   addTab: (tab) => {
     const state = get();
-    // Don't add duplicate
     if (state.tabs.find((t) => t.key === tab.key)) {
       set({ activeTabKey: tab.key });
       return;
@@ -105,7 +130,6 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
 
     const newTabs = state.tabs.filter((t) => t.key !== key);
 
-    // If removing a terminal panel, clean up sessions
     if (tab.type === 'terminal-panel') {
       const panel = state.panels.find((p) => p.key === key);
       if (panel) {
@@ -153,7 +177,9 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       connectStatus: TerminalConnectStatus.CONNECTING,
     };
 
-    // Find existing terminal panel or create new one
+    // Record latest connection
+    addLatestHost(hostId);
+
     let panelKey: string;
     const existingPanel = state.panels.find((p) =>
       state.tabs.find((t) => t.key === p.key && t.type === 'terminal-panel')
@@ -206,6 +232,8 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       connectStatus: TerminalConnectStatus.CONNECTING,
     };
 
+    addLatestHost(hostId);
+
     let panelKey: string;
     const existingPanel = state.panels.find((p) =>
       state.tabs.find((t) => t.key === p.key && t.type === 'terminal-panel')
@@ -249,7 +277,6 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     const panel = state.panels.find((p) => p.key === panelKey);
     if (!panel) return;
 
-    // Cleanup instance
     const inst = sessionInstances.get(sessionKey);
     if (inst) {
       inst.ws?.close();
@@ -260,7 +287,6 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     const newSessions = panel.sessions.filter((s) => s.key !== sessionKey);
 
     if (newSessions.length === 0) {
-      // Remove the entire panel tab
       set({
         tabs: state.tabs.filter((t) => t.key !== panelKey),
         panels: state.panels.filter((p) => p.key !== panelKey),
@@ -293,8 +319,60 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     });
   },
 
-  setTheme: (theme) => set({ theme }),
+  setUiTheme: (theme) => {
+    set({ uiTheme: theme });
+    savePreferences({ uiTheme: theme });
+  },
+
+  setTerminalTheme: (name) => {
+    set({ terminalThemeName: name });
+    savePreferences({ terminalThemeName: name });
+    get().applyPreferencesToTerminals();
+  },
+
+  setFontSize: (size) => {
+    set({ fontSize: size });
+    savePreferences({ fontSize: size });
+    get().applyPreferencesToTerminals();
+  },
+
+  setFontFamily: (family) => {
+    set({ fontFamily: family });
+    savePreferences({ fontFamily: family });
+    get().applyPreferencesToTerminals();
+  },
+
+  setCursorStyle: (style) => {
+    set({ cursorStyle: style });
+    savePreferences({ cursorStyle: style });
+    get().applyPreferencesToTerminals();
+  },
+
+  setCursorBlink: (blink) => {
+    set({ cursorBlink: blink });
+    savePreferences({ cursorBlink: blink });
+    get().applyPreferencesToTerminals();
+  },
+
+  setScrollback: (lines) => {
+    set({ scrollback: lines });
+    savePreferences({ scrollback: lines });
+  },
+
   toggleFullscreen: () => set({ fullscreen: !get().fullscreen }),
   setCommandBarVisible: (visible) => set({ commandBarVisible: visible }),
   setCommandBarText: (text) => set({ commandBarText: text }),
+
+  applyPreferencesToTerminals: () => {
+    const state = get();
+    const themeObj = getThemeByName(state.terminalThemeName);
+    sessionInstances.forEach((inst) => {
+      inst.terminal.options.theme = themeObj.schema;
+      inst.terminal.options.fontSize = state.fontSize;
+      inst.terminal.options.fontFamily = state.fontFamily;
+      inst.terminal.options.cursorStyle = state.cursorStyle;
+      inst.terminal.options.cursorBlink = state.cursorBlink;
+      inst.fitAddon.fit();
+    });
+  },
 }));

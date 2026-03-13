@@ -8,6 +8,7 @@ import type { TerminalSessionItem } from '../types';
 import { TerminalConnectStatus } from '../types';
 import { useTerminalStore, sessionInstances, type SshSessionInstance } from '../store';
 import { useAuthStore } from '@/store/auth';
+import { getThemeByName } from '../themes';
 import SshHeader from './SshHeader';
 import SearchModal from './SearchModal';
 import ContextMenu from './ContextMenu';
@@ -23,52 +24,30 @@ const SshView: React.FC<SshViewProps> = ({ session, isActive }) => {
   const [searchVisible, setSearchVisible] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const updateSessionStatus = useTerminalStore((s) => s.updateSessionStatus);
-  const theme = useTerminalStore((s) => s.theme);
+  const terminalThemeName = useTerminalStore((s) => s.terminalThemeName);
+  const fontSize = useTerminalStore((s) => s.fontSize);
+  const fontFamily = useTerminalStore((s) => s.fontFamily);
+  const cursorStyle = useTerminalStore((s) => s.cursorStyle);
+  const cursorBlink = useTerminalStore((s) => s.cursorBlink);
+  const scrollback = useTerminalStore((s) => s.scrollback);
   const token = useAuthStore((s) => s.token);
 
-  const getTerminalTheme = useCallback(() => {
-    if (theme === 'dark') {
-      return {
-        background: '#1e1e1e',
-        foreground: '#d4d4d4',
-        cursor: '#d4d4d4',
-        selectionBackground: '#264f78',
-        black: '#1e1e1e',
-        red: '#f44747',
-        green: '#6a9955',
-        yellow: '#d7ba7d',
-        blue: '#569cd6',
-        magenta: '#c586c0',
-        cyan: '#4ec9b0',
-        white: '#d4d4d4',
-      };
-    }
-    return {
-      background: '#1e1e1e',
-      foreground: '#d4d4d4',
-      cursor: '#d4d4d4',
-      selectionBackground: '#264f78',
-      black: '#1e1e1e',
-      red: '#f44747',
-      green: '#6a9955',
-      yellow: '#d7ba7d',
-      blue: '#569cd6',
-      magenta: '#c586c0',
-      cyan: '#4ec9b0',
-      white: '#d4d4d4',
-    };
-  }, [theme]);
+  const getTerminalThemeSchema = useCallback(() => {
+    return getThemeByName(terminalThemeName).schema;
+  }, [terminalThemeName]);
 
   // Initialize terminal
   useEffect(() => {
     if (!viewportRef.current) return;
 
+    const themeSchema = getTerminalThemeSchema();
     const terminal = new Terminal({
-      cursorBlink: true,
-      fontSize: 14,
-      fontFamily: 'Menlo, Monaco, "Courier New", monospace',
-      theme: getTerminalTheme(),
-      scrollback: 5000,
+      cursorBlink,
+      fontSize,
+      fontFamily,
+      cursorStyle,
+      theme: themeSchema,
+      scrollback,
       allowProposedApi: true,
     });
 
@@ -82,7 +61,6 @@ const SshView: React.FC<SshViewProps> = ({ session, isActive }) => {
 
     terminal.open(viewportRef.current);
 
-    // Delay fit to ensure container is rendered
     requestAnimationFrame(() => {
       fitAddon.fit();
     });
@@ -100,10 +78,8 @@ const SshView: React.FC<SshViewProps> = ({ session, isActive }) => {
     instanceRef.current = inst;
     sessionInstances.set(session.key, inst);
 
-    // Connect WebSocket
     connectWebSocket(inst, terminal);
 
-    // Resize handler
     const handleResize = () => {
       fitAddon.fit();
     };
@@ -143,18 +119,15 @@ const SshView: React.FC<SshViewProps> = ({ session, isActive }) => {
         updateSessionStatus(session.key, TerminalConnectStatus.CONNECTED);
         terminal.writeln('\x1b[32m连接成功\x1b[0m\r\n');
 
-        // Send initial terminal size
         const size = { type: 'resize', cols: terminal.cols, rows: terminal.rows };
         ws.send(JSON.stringify(size));
 
-        // Listen for user input
         terminal.onData((data) => {
           if (ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ type: 'input', data }));
           }
         });
 
-        // Listen for terminal resize
         terminal.onResize(({ cols, rows }) => {
           if (ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ type: 'resize', cols, rows }));
@@ -212,14 +185,18 @@ const SshView: React.FC<SshViewProps> = ({ session, isActive }) => {
         }
         case 'fontSizeUp': {
           const currentSize = inst.terminal.options.fontSize || 14;
-          inst.terminal.options.fontSize = Math.min(currentSize + 1, 28);
+          const newSize = Math.min(currentSize + 1, 28);
+          inst.terminal.options.fontSize = newSize;
           inst.fitAddon.fit();
+          useTerminalStore.getState().setFontSize(newSize);
           break;
         }
         case 'fontSizeDown': {
           const currentSize2 = inst.terminal.options.fontSize || 14;
-          inst.terminal.options.fontSize = Math.max(currentSize2 - 1, 8);
+          const newSize2 = Math.max(currentSize2 - 1, 8);
+          inst.terminal.options.fontSize = newSize2;
           inst.fitAddon.fit();
+          useTerminalStore.getState().setFontSize(newSize2);
           break;
         }
         case 'clear': {
@@ -238,7 +215,6 @@ const SshView: React.FC<SshViewProps> = ({ session, isActive }) => {
         }
       }
 
-      // Re-focus terminal after action
       setTimeout(() => inst.terminal.focus(), 50);
     },
     [connectWebSocket]
@@ -259,14 +235,12 @@ const SshView: React.FC<SshViewProps> = ({ session, isActive }) => {
     }
   }, []);
 
-  // Send command from command bar
   const sendCommand = useCallback((command: string) => {
     const inst = instanceRef.current;
     if (!inst || !inst.ws || inst.ws.readyState !== WebSocket.OPEN) return;
     inst.ws.send(JSON.stringify({ type: 'input', data: command + '\n' }));
   }, []);
 
-  // Expose sendCommand for parent
   useEffect(() => {
     const inst = instanceRef.current;
     if (inst) {
@@ -274,12 +248,14 @@ const SshView: React.FC<SshViewProps> = ({ session, isActive }) => {
     }
   }, [sendCommand]);
 
+  const themeSchema = getTerminalThemeSchema();
+
   return (
     <div className="ssh-view-container" style={{ display: isActive ? 'flex' : 'none' }}>
       <SshHeader session={session} onAction={handleAction} />
       <div
         className="ssh-wrapper"
-        style={{ background: getTerminalTheme().background }}
+        style={{ background: themeSchema.background as string }}
         onContextMenu={handleContextMenu}
       >
         <div className="ssh-viewport" ref={viewportRef} />

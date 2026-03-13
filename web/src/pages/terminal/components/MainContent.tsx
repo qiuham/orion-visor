@@ -2,6 +2,7 @@ import { useTerminalStore } from '../store';
 import NewConnectionView from './NewConnectionView';
 import TerminalPanel from './TerminalPanel';
 import CommandBar from './CommandBar';
+import DisplaySettingView from './DisplaySettingView';
 
 const MainContent: React.FC = () => {
   const { tabs, activeTabKey, panels, commandBarVisible } = useTerminalStore();
@@ -41,7 +42,18 @@ const MainContent: React.FC = () => {
             );
           }
 
-          // Placeholder for other tab types (settings, etc.)
+          if (tab.type === 'display-setting' || tab.type === 'theme-setting') {
+            return (
+              <div
+                key={tab.key}
+                className={`terminal-tab-content ${isActive ? 'active' : ''}`}
+              >
+                <DisplaySettingView />
+              </div>
+            );
+          }
+
+          // Placeholder for other tab types
           return (
             <div
               key={tab.key}

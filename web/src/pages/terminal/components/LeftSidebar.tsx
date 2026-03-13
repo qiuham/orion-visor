@@ -1,12 +1,13 @@
 import {
   PlusOutlined,
   BgColorsOutlined,
+  SettingOutlined,
 } from '@ant-design/icons';
 import { Tooltip } from 'antd';
 import { useTerminalStore } from '../store';
 
 const LeftSidebar: React.FC = () => {
-  const { activeTabKey, setActiveTab, setTheme, theme } = useTerminalStore();
+  const { activeTabKey, setActiveTab, addTab, setUiTheme, uiTheme } = useTerminalStore();
 
   const topActions = [
     {
@@ -19,10 +20,21 @@ const LeftSidebar: React.FC = () => {
 
   const bottomActions = [
     {
-      key: 'theme-setting',
+      key: 'display-setting',
+      icon: <SettingOutlined />,
+      title: '显示设置',
+      onClick: () => addTab({
+        key: 'display-setting',
+        title: '显示设置',
+        type: 'display-setting',
+        closable: true,
+      }),
+    },
+    {
+      key: 'theme-toggle',
       icon: <BgColorsOutlined />,
-      title: theme === 'light' ? '切换暗色主题' : '切换亮色主题',
-      onClick: () => setTheme(theme === 'light' ? 'dark' : 'light'),
+      title: uiTheme === 'light' ? '切换暗色主题' : '切换亮色主题',
+      onClick: () => setUiTheme(uiTheme === 'light' ? 'dark' : 'light'),
     },
   ];
 
@@ -46,7 +58,10 @@ const LeftSidebar: React.FC = () => {
         {bottomActions.map((action) => (
           <Tooltip key={action.key} title={action.title} placement="right">
             <div className="terminal-sidebar-icon-wrapper">
-              <button className="terminal-sidebar-icon" onClick={action.onClick}>
+              <button
+                className={`terminal-sidebar-icon ${activeTabKey === action.key ? 'active' : ''}`}
+                onClick={action.onClick}
+              >
                 {action.icon}
               </button>
             </div>

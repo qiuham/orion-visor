@@ -1,15 +1,19 @@
-import { useEffect, useState, useMemo } from 'react';
-import { Input, Radio, Empty, Tag, Tooltip, Tree, Spin } from 'antd';
+import { useEffect, useState, useMemo, useCallback } from 'react';
+import { Input, Radio, Empty, Tag, Tooltip, Tree, Spin, message } from 'antd';
 import {
   DesktopOutlined,
   CodeOutlined,
   FolderOutlined,
   UnorderedListOutlined,
   AppstoreOutlined,
+  StarOutlined,
+  StarFilled,
+  ClockCircleOutlined,
 } from '@ant-design/icons';
 import { getHostList, type Host } from '@/api/host';
 import { getHostGroupList, getGroupHosts, type HostGroup } from '@/api/hostGroup';
 import { useTerminalStore } from '../store';
+import { getLatestHostIds, getFavoriteHostIds, toggleFavoriteHost, savePreferences, loadPreferences } from '../preferences';
 import type { NewConnectionType } from '../types';
 
 const NewConnectionView: React.FC = () => {
@@ -17,9 +21,10 @@ const NewConnectionView: React.FC = () => {
   const [groups, setGroups] = useState<HostGroup[]>([]);
   const [groupHostMap, setGroupHostMap] = useState<Record<number, number[]>>({});
   const [loading, setLoading] = useState(false);
-  const [viewType, setViewType] = useState<NewConnectionType>('list');
+  const [viewType, setViewType] = useState<NewConnectionType>(() => loadPreferences().newConnectionType);
   const [filterValue, setFilterValue] = useState('');
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
+  const [favoriteIds, setFavoriteIds] = useState<number[]>(() => getFavoriteHostIds());
   const { openSshSession, openSftpSession } = useTerminalStore();
 
   // Load host list
@@ -33,11 +38,10 @@ const NewConnectionView: React.FC = () => {
         setHosts(hostRes.rows || []);
         setGroups(groupRes || []);
 
-        // Load group-host mappings
         if (groupRes?.length) {
           const promises = groupRes.map((g: HostGroup) =>
             getGroupHosts(g.id).then((hostIds) => ({ groupId: g.id, hostIds: hostIds || [] }))
-              .catch(() => ({ groupId: g.id, hostIds: [] }))
+              .catch(() => ({ groupId: g.id, hostIds: [] as number[] }))
           );
           Promise.all(promises).then((results) => {
             const map: Record<number, number[]> = {};
@@ -56,10 +60,18 @@ const NewConnectionView: React.FC = () => {
   const filteredHosts = useMemo(() => {
     let list = hosts;
 
-    // Apply group filter
+    // Apply view type filter
     if (viewType === 'group' && selectedGroupId !== null) {
       const hostIds = groupHostMap[selectedGroupId] || [];
       list = list.filter((h) => hostIds.includes(h.id));
+    } else if (viewType === 'favorite') {
+      list = list.filter((h) => favoriteIds.includes(h.id));
+    } else if (viewType === 'latest') {
+      const latestIds = getLatestHostIds();
+      // Keep order of latestIds
+      list = latestIds
+        .map((id) => hosts.find((h) => h.id === id))
+        .filter((h): h is Host => !!h);
     }
 
     // Apply text filter
@@ -75,7 +87,7 @@ const NewConnectionView: React.FC = () => {
     }
 
     return list;
-  }, [hosts, filterValue, viewType, selectedGroupId, groupHostMap]);
+  }, [hosts, filterValue, viewType, selectedGroupId, groupHostMap, favoriteIds]);
 
   // Build tree data for groups
   const treeData = useMemo(() => {
@@ -92,12 +104,24 @@ const NewConnectionView: React.FC = () => {
     return buildTree(0);
   }, [groups, groupHostMap]);
 
-  const handleOpenSsh = (host: Host) => {
+  const handleOpenSsh = useCallback((host: Host) => {
     openSshSession(host.id, host.name, `${host.address}:${host.port}`);
-  };
+  }, [openSshSession]);
 
-  const handleOpenSftp = (host: Host) => {
+  const handleOpenSftp = useCallback((host: Host) => {
     openSftpSession(host.id, host.name, `${host.address}:${host.port}`);
+  }, [openSftpSession]);
+
+  const handleToggleFavorite = useCallback((hostId: number) => {
+    const nowFav = toggleFavoriteHost(hostId);
+    setFavoriteIds(getFavoriteHostIds());
+    message.success(nowFav ? '已收藏' : '已取消收藏');
+  }, []);
+
+  const handleViewTypeChange = (type: NewConnectionType) => {
+    setViewType(type);
+    setSelectedGroupId(null);
+    savePreferences({ newConnectionType: type });
   };
 
   return (
@@ -109,10 +133,7 @@ const NewConnectionView: React.FC = () => {
         <div className="new-connection-actions">
           <Radio.Group
             value={viewType}
-            onChange={(e) => {
-              setViewType(e.target.value);
-              setSelectedGroupId(null);
-            }}
+            onChange={(e) => handleViewTypeChange(e.target.value)}
             optionType="button"
             size="small"
           >
@@ -121,6 +142,12 @@ const NewConnectionView: React.FC = () => {
             </Radio.Button>
             <Radio.Button value="list">
               <UnorderedListOutlined /> 列表
+            </Radio.Button>
+            <Radio.Button value="favorite">
+              <StarOutlined /> 收藏
+            </Radio.Button>
+            <Radio.Button value="latest">
+              <ClockCircleOutlined /> 最近
             </Radio.Button>
           </Radio.Group>
           <Input.Search
@@ -133,7 +160,9 @@ const NewConnectionView: React.FC = () => {
         </div>
 
         {/* Subtitle */}
-        <h3 className="new-connection-subtitle">授权主机</h3>
+        <h3 className="new-connection-subtitle">
+          {viewType === 'favorite' ? '收藏主机' : viewType === 'latest' ? '最近连接' : '授权主机'}
+        </h3>
 
         {/* Content */}
         <Spin spinning={loading}>
@@ -152,16 +181,20 @@ const NewConnectionView: React.FC = () => {
               <div className="host-group-tree-content">
                 <HostList
                   hosts={filteredHosts}
+                  favoriteIds={favoriteIds}
                   onOpenSsh={handleOpenSsh}
                   onOpenSftp={handleOpenSftp}
+                  onToggleFavorite={handleToggleFavorite}
                 />
               </div>
             </div>
           ) : (
             <HostList
               hosts={filteredHosts}
+              favoriteIds={favoriteIds}
               onOpenSsh={handleOpenSsh}
               onOpenSftp={handleOpenSftp}
+              onToggleFavorite={handleToggleFavorite}
             />
           )}
         </Spin>
@@ -173,17 +206,19 @@ const NewConnectionView: React.FC = () => {
 // ============ Host List Component ============
 interface HostListProps {
   hosts: Host[];
+  favoriteIds: number[];
   onOpenSsh: (host: Host) => void;
   onOpenSftp: (host: Host) => void;
+  onToggleFavorite: (hostId: number) => void;
 }
 
-const HostList: React.FC<HostListProps> = ({ hosts, onOpenSsh, onOpenSftp }) => {
+const HostList: React.FC<HostListProps> = ({ hosts, favoriteIds, onOpenSsh, onOpenSftp, onToggleFavorite }) => {
   if (hosts.length === 0) {
     return (
       <div style={{ padding: '40px 0' }}>
         <Empty
           image={<DesktopOutlined style={{ fontSize: 48, color: '#d9d9d9' }} />}
-          description="暂无授权主机"
+          description="暂无主机"
         />
       </div>
     );
@@ -191,70 +226,90 @@ const HostList: React.FC<HostListProps> = ({ hosts, onOpenSsh, onOpenSftp }) => 
 
   return (
     <div className="host-list-container">
-      {hosts.map((host) => (
-        <div key={host.id} className="host-list-item">
-          {/* Left: icon + name */}
-          <div className="host-list-item-left">
-            <div className="host-list-item-icon">
-              <DesktopOutlined />
-            </div>
-            <Tooltip title={`${host.name} (${host.code || ''})`} placement="top">
-              <span className="host-list-item-name">
-                {host.name} {host.code ? `(${host.code})` : ''}
-              </span>
-            </Tooltip>
-          </div>
-
-          {/* Center: address */}
-          <div className="host-list-item-center">
-            <Tooltip title={`${host.address}:${host.port}`} placement="top">
-              <span className="host-list-item-address">
-                {host.address}:{host.port}
-              </span>
-            </Tooltip>
-          </div>
-
-          {/* Right: tags + actions */}
-          <div className="host-list-item-right">
-            <div className="host-list-item-tags">
-              {host.tags &&
-                host.tags.split(',').filter(Boolean).map((tag) => (
-                  <Tag key={tag} color="blue">
-                    {tag}
-                  </Tag>
-                ))}
-            </div>
-            <div className="host-list-item-actions">
-              <Tooltip title="SSH 终端" placement="top">
-                <div className="terminal-sidebar-icon-wrapper">
-                  <button
-                    className="terminal-sidebar-icon"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onOpenSsh(host);
-                    }}
-                  >
-                    <CodeOutlined />
-                  </button>
-                </div>
-              </Tooltip>
-              <Tooltip title="SFTP 文件" placement="top">
-                <div className="terminal-sidebar-icon-wrapper">
-                  <button
-                    className="terminal-sidebar-icon"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onOpenSftp(host);
-                    }}
-                  >
-                    <FolderOutlined />
-                  </button>
-                </div>
+      {hosts.map((host) => {
+        const isFav = favoriteIds.includes(host.id);
+        return (
+          <div key={host.id} className="host-list-item">
+            {/* Left: icon + name */}
+            <div className="host-list-item-left">
+              <div className="host-list-item-icon">
+                <DesktopOutlined />
+              </div>
+              <Tooltip title={`${host.name} (${host.code || ''})`} placement="top">
+                <span className="host-list-item-name">
+                  {host.name} {host.code ? `(${host.code})` : ''}
+                </span>
               </Tooltip>
             </div>
+
+            {/* Center: address */}
+            <div className="host-list-item-center">
+              <Tooltip title={`${host.address}:${host.port}`} placement="top">
+                <span className="host-list-item-address">
+                  {host.address}:{host.port}
+                </span>
+              </Tooltip>
+            </div>
+
+            {/* Right: tags + actions */}
+            <div className="host-list-item-right">
+              <div className="host-list-item-tags">
+                {host.tags &&
+                  host.tags.split(',').filter(Boolean).map((tag) => (
+                    <Tag key={tag} color="blue">
+                      {tag}
+                    </Tag>
+                  ))}
+              </div>
+              <div className="host-list-item-actions">
+                <Tooltip title="SSH 终端" placement="top">
+                  <div className="terminal-sidebar-icon-wrapper">
+                    <button
+                      className="terminal-sidebar-icon"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenSsh(host);
+                      }}
+                    >
+                      <CodeOutlined />
+                    </button>
+                  </div>
+                </Tooltip>
+                <Tooltip title="SFTP 文件" placement="top">
+                  <div className="terminal-sidebar-icon-wrapper">
+                    <button
+                      className="terminal-sidebar-icon"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenSftp(host);
+                      }}
+                    >
+                      <FolderOutlined />
+                    </button>
+                  </div>
+                </Tooltip>
+                <Tooltip title={isFav ? '取消收藏' : '收藏'} placement="top">
+                  <div className="terminal-sidebar-icon-wrapper">
+                    <button
+                      className="terminal-sidebar-icon"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleFavorite(host.id);
+                      }}
+                    >
+                      {isFav ? (
+                        <StarFilled style={{ color: '#fadb14' }} />
+                      ) : (
+                        <StarOutlined />
+                      )}
+                    </button>
+                  </div>
+                </Tooltip>
+              </div>
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 };
