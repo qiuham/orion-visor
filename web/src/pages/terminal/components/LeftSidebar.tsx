@@ -2,6 +2,7 @@ import {
   PlusOutlined,
   BgColorsOutlined,
   SettingOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons';
 import { Tooltip } from 'antd';
 import { useTerminalStore } from '../store';
@@ -19,6 +20,17 @@ const LeftSidebar: React.FC = () => {
   ];
 
   const bottomActions = [
+    {
+      key: 'shortcut-setting',
+      icon: <ThunderboltOutlined />,
+      title: '快捷键设置',
+      onClick: () => addTab({
+        key: 'shortcut-setting',
+        title: '快捷键设置',
+        type: 'shortcut-setting',
+        closable: true,
+      }),
+    },
     {
       key: 'display-setting',
       icon: <SettingOutlined />,

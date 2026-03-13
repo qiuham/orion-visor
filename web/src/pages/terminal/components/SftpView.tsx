@@ -1,6 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Table, Button, Breadcrumb, Space, message, Upload, Modal, Input, Tooltip, Dropdown } from 'antd';
-import type { MenuProps } from 'antd';
+import { Table, Button, Breadcrumb, Space, message, Upload, Modal, Input, Tooltip } from 'antd';
 import {
   FolderOutlined,
   FileOutlined,
@@ -11,7 +10,6 @@ import {
   DeleteOutlined,
   DownloadOutlined,
   ArrowUpOutlined,
-  EditOutlined,
   EyeOutlined,
 } from '@ant-design/icons';
 import { listFiles, mkdir, removeFile, downloadFile, uploadFile, getFileContent, type FileInfo } from '@/api/sftp';
@@ -160,20 +158,6 @@ const SftpView: React.FC<SftpViewProps> = ({ session, isActive }) => {
 
   // Breadcrumb parts
   const pathParts = currentPath.split('/').filter(Boolean);
-
-  const getContextMenu = (file: FileInfo): MenuProps['items'] => {
-    const items: MenuProps['items'] = [];
-    if (!file.isDir) {
-      items.push(
-        { key: 'download', label: '下载', icon: <DownloadOutlined /> },
-        { key: 'preview', label: '查看内容', icon: <EyeOutlined /> },
-      );
-    }
-    items.push(
-      { key: 'delete', label: '删除', icon: <DeleteOutlined />, danger: true },
-    );
-    return items;
-  };
 
   const columns = [
     {

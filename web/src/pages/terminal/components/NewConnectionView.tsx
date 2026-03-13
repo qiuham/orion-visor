@@ -9,8 +9,10 @@ import {
   StarOutlined,
   StarFilled,
   ClockCircleOutlined,
+  EditOutlined,
+  CheckOutlined,
 } from '@ant-design/icons';
-import { getHostList, type Host } from '@/api/host';
+import { getHostList, updateHost, type Host } from '@/api/host';
 import { getHostGroupList, getGroupHosts, type HostGroup } from '@/api/hostGroup';
 import { useTerminalStore } from '../store';
 import { getLatestHostIds, getFavoriteHostIds, toggleFavoriteHost, savePreferences, loadPreferences } from '../preferences';
@@ -104,13 +106,25 @@ const NewConnectionView: React.FC = () => {
     return buildTree(0);
   }, [groups, groupHostMap]);
 
+  const getDisplayName = (host: Host) => host.alias || host.name;
+
   const handleOpenSsh = useCallback((host: Host) => {
-    openSshSession(host.id, host.name, `${host.address}:${host.port}`);
+    openSshSession(host.id, getDisplayName(host), `${host.address}:${host.port}`);
   }, [openSshSession]);
 
   const handleOpenSftp = useCallback((host: Host) => {
-    openSftpSession(host.id, host.name, `${host.address}:${host.port}`);
+    openSftpSession(host.id, getDisplayName(host), `${host.address}:${host.port}`);
   }, [openSftpSession]);
+
+  const handleUpdateAlias = useCallback(async (hostId: number, alias: string) => {
+    try {
+      await updateHost(hostId, { alias });
+      setHosts((prev) => prev.map((h) => (h.id === hostId ? { ...h, alias } : h)));
+      message.success('别名已更新');
+    } catch {
+      message.error('更新别名失败');
+    }
+  }, []);
 
   const handleToggleFavorite = useCallback((hostId: number) => {
     const nowFav = toggleFavoriteHost(hostId);
@@ -185,6 +199,7 @@ const NewConnectionView: React.FC = () => {
                   onOpenSsh={handleOpenSsh}
                   onOpenSftp={handleOpenSftp}
                   onToggleFavorite={handleToggleFavorite}
+                  onUpdateAlias={handleUpdateAlias}
                 />
               </div>
             </div>
@@ -195,6 +210,7 @@ const NewConnectionView: React.FC = () => {
               onOpenSsh={handleOpenSsh}
               onOpenSftp={handleOpenSftp}
               onToggleFavorite={handleToggleFavorite}
+              onUpdateAlias={handleUpdateAlias}
             />
           )}
         </Spin>
@@ -210,9 +226,23 @@ interface HostListProps {
   onOpenSsh: (host: Host) => void;
   onOpenSftp: (host: Host) => void;
   onToggleFavorite: (hostId: number) => void;
+  onUpdateAlias: (hostId: number, alias: string) => void;
 }
 
-const HostList: React.FC<HostListProps> = ({ hosts, favoriteIds, onOpenSsh, onOpenSftp, onToggleFavorite }) => {
+const HostList: React.FC<HostListProps> = ({ hosts, favoriteIds, onOpenSsh, onOpenSftp, onToggleFavorite, onUpdateAlias }) => {
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editValue, setEditValue] = useState('');
+
+  const startEdit = (host: Host) => {
+    setEditingId(host.id);
+    setEditValue(host.alias || '');
+  };
+
+  const saveAlias = (hostId: number) => {
+    onUpdateAlias(hostId, editValue.trim());
+    setEditingId(null);
+  };
+
   if (hosts.length === 0) {
     return (
       <div style={{ padding: '40px 0' }}>
@@ -228,18 +258,48 @@ const HostList: React.FC<HostListProps> = ({ hosts, favoriteIds, onOpenSsh, onOp
     <div className="host-list-container">
       {hosts.map((host) => {
         const isFav = favoriteIds.includes(host.id);
+        const isEditing = editingId === host.id;
+        const displayName = host.alias || host.name;
         return (
           <div key={host.id} className="host-list-item">
-            {/* Left: icon + name */}
+            {/* Left: icon + name (with inline alias edit) */}
             <div className="host-list-item-left">
               <div className="host-list-item-icon">
                 <DesktopOutlined />
               </div>
-              <Tooltip title={`${host.name} (${host.code || ''})`} placement="top">
-                <span className="host-list-item-name">
-                  {host.name} {host.code ? `(${host.code})` : ''}
-                </span>
-              </Tooltip>
+              {isEditing ? (
+                <Input
+                  size="small"
+                  value={editValue}
+                  maxLength={32}
+                  style={{ width: 160 }}
+                  autoFocus
+                  placeholder="输入别名"
+                  onChange={(e) => setEditValue(e.target.value)}
+                  onPressEnter={() => saveAlias(host.id)}
+                  onBlur={() => saveAlias(host.id)}
+                  suffix={
+                    <CheckOutlined
+                      style={{ color: '#52c41a', cursor: 'pointer' }}
+                      onClick={() => saveAlias(host.id)}
+                    />
+                  }
+                />
+              ) : (
+                <>
+                  <Tooltip title={`${host.name} (${host.code || ''})`} placement="top">
+                    <span className="host-list-item-name">
+                      {displayName}
+                    </span>
+                  </Tooltip>
+                  <Tooltip title="编辑别名" placement="top">
+                    <EditOutlined
+                      style={{ marginLeft: 4, fontSize: 12, color: '#bbb', cursor: 'pointer' }}
+                      onClick={(e) => { e.stopPropagation(); startEdit(host); }}
+                    />
+                  </Tooltip>
+                </>
+              )}
             </div>
 
             {/* Center: address */}

@@ -12,6 +12,7 @@ export interface Host {
   status: number;
   tags: string;
   remark: string;
+  alias?: string;
   identityId: number;
   createTime: string;
   updateTime: string;
@@ -44,6 +45,7 @@ export interface HostUpdateParams {
   status?: number;
   tags?: string;
   remark?: string;
+  alias?: string;
   identityId?: number;
 }
 

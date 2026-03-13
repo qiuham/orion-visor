@@ -3,6 +3,7 @@ import NewConnectionView from './NewConnectionView';
 import TerminalPanel from './TerminalPanel';
 import CommandBar from './CommandBar';
 import DisplaySettingView from './DisplaySettingView';
+import ShortcutSettingView from './ShortcutSettingView';
 
 const MainContent: React.FC = () => {
   const { tabs, activeTabKey, panels, commandBarVisible } = useTerminalStore();
@@ -49,6 +50,17 @@ const MainContent: React.FC = () => {
                 className={`terminal-tab-content ${isActive ? 'active' : ''}`}
               >
                 <DisplaySettingView />
+              </div>
+            );
+          }
+
+          if (tab.type === 'shortcut-setting') {
+            return (
+              <div
+                key={tab.key}
+                className={`terminal-tab-content ${isActive ? 'active' : ''}`}
+              >
+                <ShortcutSettingView />
               </div>
             );
           }

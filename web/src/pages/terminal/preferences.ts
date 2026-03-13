@@ -1,5 +1,8 @@
 // ============ Terminal Preferences (localStorage) ============
 
+import type { ShortcutKeyConfig } from './types';
+import { DefaultShortcuts } from './types';
+
 export interface TerminalPreferences {
   // Display
   fontFamily: string;
@@ -28,6 +31,10 @@ export interface TerminalPreferences {
 
   // Favorite host IDs
   favoriteHostIds: number[];
+
+  // Shortcuts
+  shortcutEnabled: boolean;
+  shortcuts: ShortcutKeyConfig[];
 }
 
 const STORAGE_KEY = 'terminal_preferences';
@@ -40,7 +47,7 @@ const defaultPreferences: TerminalPreferences = {
   cursorStyle: 'block',
   cursorBlink: true,
   scrollback: 5000,
-  terminalThemeName: 'default-dark',
+  terminalThemeName: 'dracula',
   uiTheme: 'light',
   newConnectionType: 'list',
   actionBarItems: {
@@ -64,6 +71,8 @@ const defaultPreferences: TerminalPreferences = {
   },
   latestHostIds: [],
   favoriteHostIds: [],
+  shortcutEnabled: true,
+  shortcuts: DefaultShortcuts,
 };
 
 export function loadPreferences(): TerminalPreferences {

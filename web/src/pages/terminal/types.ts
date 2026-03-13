@@ -65,6 +65,48 @@ export const ContextMenuItems = [
 // New connection view types
 export type NewConnectionType = 'group' | 'list' | 'favorite' | 'latest';
 
+// ============ Shortcut Key Config ============
+
+export interface ShortcutKeyConfig {
+  item: string;
+  label: string;
+  type: 'global' | 'session' | 'terminal';
+  ctrlKey: boolean;
+  shiftKey: boolean;
+  altKey: boolean;
+  code: string;
+  enabled: boolean;
+}
+
+export const DefaultShortcuts: ShortcutKeyConfig[] = [
+  // 全局快捷键
+  { item: 'changeToPrevTab', label: '切换到上一个Tab', type: 'global', ctrlKey: true, shiftKey: true, altKey: false, code: 'ArrowLeft', enabled: true },
+  { item: 'changeToNextTab', label: '切换到下一个Tab', type: 'global', ctrlKey: true, shiftKey: true, altKey: false, code: 'ArrowRight', enabled: true },
+  { item: 'closeTab', label: '关闭当前Tab', type: 'global', ctrlKey: true, shiftKey: true, altKey: false, code: 'KeyW', enabled: true },
+  { item: 'openCommandSnippet', label: '打开命令片段', type: 'global', ctrlKey: true, shiftKey: false, altKey: false, code: 'KeyP', enabled: true },
+  { item: 'screenshot', label: '截图', type: 'global', ctrlKey: true, shiftKey: true, altKey: false, code: 'KeyS', enabled: true },
+  { item: 'openSftp', label: '打开SFTP', type: 'global', ctrlKey: true, shiftKey: true, altKey: false, code: 'KeyF', enabled: true },
+  { item: 'toggleCommandBar', label: '切换命令栏', type: 'global', ctrlKey: true, shiftKey: false, altKey: false, code: 'Backquote', enabled: true },
+  { item: 'checkAppSetting', label: '打开设置', type: 'global', ctrlKey: true, shiftKey: false, altKey: false, code: 'Comma', enabled: true },
+  { item: 'toggleFullscreen', label: '切换全屏', type: 'global', ctrlKey: false, shiftKey: false, altKey: false, code: 'F11', enabled: true },
+  // 会话快捷键
+  { item: 'changeToPrevSession', label: '切换到上一个会话', type: 'session', ctrlKey: true, shiftKey: false, altKey: true, code: 'ArrowLeft', enabled: true },
+  { item: 'changeToNextSession', label: '切换到下一个会话', type: 'session', ctrlKey: true, shiftKey: false, altKey: true, code: 'ArrowRight', enabled: true },
+  { item: 'closeSession', label: '关闭当前会话', type: 'session', ctrlKey: true, shiftKey: false, altKey: true, code: 'KeyW', enabled: true },
+  { item: 'openNewConnect', label: '打开新连接', type: 'session', ctrlKey: true, shiftKey: false, altKey: true, code: 'KeyN', enabled: true },
+  { item: 'connectToCurrentHost', label: '连接当前主机', type: 'session', ctrlKey: true, shiftKey: false, altKey: true, code: 'KeyR', enabled: true },
+  // 终端快捷键
+  { item: 'copy', label: '复制', type: 'terminal', ctrlKey: true, shiftKey: true, altKey: false, code: 'KeyC', enabled: true },
+  { item: 'paste', label: '粘贴', type: 'terminal', ctrlKey: true, shiftKey: true, altKey: false, code: 'KeyV', enabled: true },
+  { item: 'selectAll', label: '全选', type: 'terminal', ctrlKey: true, shiftKey: true, altKey: false, code: 'KeyA', enabled: true },
+  { item: 'search', label: '搜索', type: 'terminal', ctrlKey: true, shiftKey: false, altKey: false, code: 'KeyF', enabled: true },
+  { item: 'fontSizeUp', label: '增大字号', type: 'terminal', ctrlKey: true, shiftKey: false, altKey: false, code: 'Equal', enabled: true },
+  { item: 'fontSizeDown', label: '减小字号', type: 'terminal', ctrlKey: true, shiftKey: false, altKey: false, code: 'Minus', enabled: true },
+  { item: 'clear', label: '清屏', type: 'terminal', ctrlKey: true, shiftKey: true, altKey: false, code: 'KeyL', enabled: true },
+  { item: 'toTop', label: '到顶部', type: 'terminal', ctrlKey: true, shiftKey: false, altKey: false, code: 'Home', enabled: true },
+  { item: 'toBottom', label: '到底部', type: 'terminal', ctrlKey: true, shiftKey: false, altKey: false, code: 'End', enabled: true },
+];
+
 // Generate unique key
 let keyCounter = 0;
 export function generateKey(prefix = 'tab'): string {
