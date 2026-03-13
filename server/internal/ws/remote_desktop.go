@@ -10,8 +10,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"github.com/orion-visor/server/internal/guacd"
-	"github.com/orion-visor/server/internal/service"
+	"github.com/ops-platform/server/internal/guacd"
+	"github.com/ops-platform/server/internal/service"
 )
 
 // RemoteDesktopMessage 前端 → 后端的消息格式

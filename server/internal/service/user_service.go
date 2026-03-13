@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 
-	"github.com/orion-visor/server/internal/model"
+	"github.com/ops-platform/server/internal/model"
 	"gorm.io/gorm"
 )
 
@@ -119,7 +119,7 @@ func (s *UserService) UpdatePassword(id int64, hashedPassword string) error {
 }
 
 // checkPassword verifies the password against the stored hash.
-// orion-visor uses MD5 hashing (legacy), we keep compatibility.
+// MD5 hashing (legacy compatibility).
 func checkPassword(input, stored string) bool {
 	h := md5.Sum([]byte(input))
 	return hex.EncodeToString(h[:]) == stored

@@ -29,7 +29,7 @@ const TerminalPage = () => {
   useEffect(() => {
     getHostList({ pageSize: 1000, status: 1 })
       .then((res) => setHosts(res.rows || []))
-      .catch(() => {});
+      .catch((e) => console.warn('加载主机列表失败', e));
   }, []);
 
   // 初始化终端
@@ -54,7 +54,7 @@ const TerminalPage = () => {
     terminal.open(termRef.current);
     fitAddon.fit();
 
-    terminal.writeln('\x1b[36m欢迎使用 Orion Visor Web 终端\x1b[0m');
+    terminal.writeln('\x1b[36m欢迎使用 Web 终端\x1b[0m');
     terminal.writeln('请选择主机后点击「连接」开始 SSH 会话\r\n');
 
     terminalRef.current = terminal;

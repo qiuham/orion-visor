@@ -24,8 +24,8 @@ const StatsPage = () => {
       const [s, t] = await Promise.all([getDashboardStats(), getStatsTrend(days)]);
       setStats(s);
       setTrend(t);
-    } catch {
-      // ignore
+    } catch (e) {
+      console.warn('加载统计数据失败', e);
     } finally {
       setLoading(false);
     }

@@ -7,7 +7,7 @@ database:
   port: 3306
   user: root
   password: root
-  dbname: orion_visor
+  dbname: ops_platform
   charset: utf8mb4
 
 redis:
@@ -17,7 +17,7 @@ redis:
   db: 0
 
 jwt:
-  secret: orion-visor-secret-key
+  secret: ops-platform-secret-key
   expire: 24h
 
 ssh:

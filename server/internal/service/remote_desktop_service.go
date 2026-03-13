@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/orion-visor/server/internal/guacd"
-	"github.com/orion-visor/server/internal/model"
+	"github.com/ops-platform/server/internal/guacd"
+	"github.com/ops-platform/server/internal/model"
 	"gorm.io/gorm"
 )
 

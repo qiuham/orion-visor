@@ -37,7 +37,7 @@ const LoginPage = () => {
       background: '#f0f2f5',
     }}>
       <LoginForm
-        title="Orion Visor"
+        title="运维平台"
         subTitle="轻量级运维管理平台"
         onFinish={handleLogin}
       >

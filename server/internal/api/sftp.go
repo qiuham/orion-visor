@@ -8,8 +8,8 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	internalssh "github.com/orion-visor/server/internal/ssh"
-	"github.com/orion-visor/server/pkg/response"
+	internalssh "github.com/ops-platform/server/internal/ssh"
+	"github.com/ops-platform/server/pkg/response"
 	"github.com/pkg/sftp"
 )
 

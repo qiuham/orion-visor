@@ -16,8 +16,8 @@ const TagPage = () => {
     try {
       const data = await getTagList();
       setTags(data || []);
-    } catch {
-      // ignore
+    } catch (e) {
+      console.warn('加载标签失败', e);
     } finally {
       setLoading(false);
     }

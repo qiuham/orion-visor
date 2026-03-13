@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Result 统一响应格式 (兼容前端 orion-visor-ui 的约定)
+// Result 统一响应格式
 // 前端 interceptor 期望: {code: 200, msg: "ok", data: ...}
 type Result struct {
 	Code int         `json:"code"`

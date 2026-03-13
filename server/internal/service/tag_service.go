@@ -1,7 +1,7 @@
 package service
 
 import (
-	"github.com/orion-visor/server/internal/model"
+	"github.com/ops-platform/server/internal/model"
 	"gorm.io/gorm"
 )
 

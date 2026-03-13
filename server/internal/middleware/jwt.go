@@ -6,7 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/orion-visor/server/pkg/response"
+	"github.com/ops-platform/server/pkg/response"
 )
 
 var jwtSecret []byte

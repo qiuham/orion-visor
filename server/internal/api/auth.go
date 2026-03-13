@@ -2,10 +2,10 @@ package api
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/orion-visor/server/internal/middleware"
-	"github.com/orion-visor/server/internal/model"
-	"github.com/orion-visor/server/internal/service"
-	"github.com/orion-visor/server/pkg/response"
+	"github.com/ops-platform/server/internal/middleware"
+	"github.com/ops-platform/server/internal/model"
+	"github.com/ops-platform/server/internal/service"
+	"github.com/ops-platform/server/pkg/response"
 )
 
 type AuthAPI struct {

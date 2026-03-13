@@ -49,7 +49,7 @@ const ExecCommandPage = () => {
   useEffect(() => {
     getHostList({ pageSize: 1000, status: 1 })
       .then((res) => setHosts(res.rows || []))
-      .catch(() => {});
+      .catch((e) => console.warn('加载主机列表失败', e));
   }, []);
 
   // 轮询任务状态
@@ -70,8 +70,8 @@ const ExecCommandPage = () => {
         if (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') {
           setPolling(false);
         }
-      } catch {
-        // ignore
+      } catch (e) {
+        console.warn('轮询任务状态失败', e);
       }
     }, 2000);
     return () => clearInterval(timer);

@@ -2,7 +2,7 @@ package model
 
 import "time"
 
-// User maps to system_user table (reuse existing orion-visor schema)
+// User maps to system_user table
 type User struct {
 	ID         int64     `json:"id" gorm:"primaryKey;autoIncrement"`
 	Username   string    `json:"username" gorm:"size:32;uniqueIndex"`

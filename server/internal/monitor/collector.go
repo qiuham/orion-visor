@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	internalssh "github.com/orion-visor/server/internal/ssh"
+	internalssh "github.com/ops-platform/server/internal/ssh"
 )
 
 // Metrics 是一次采集的全部指标
@@ -111,7 +111,9 @@ func parseMetrics(output string) (*Metrics, error) {
 	if s, ok := sections["LOADAVG"]; ok {
 		parts := strings.Fields(s)
 		for i := 0; i < 3 && i < len(parts); i++ {
-			m.LoadAvg[i], _ = strconv.ParseFloat(parts[i], 64)
+			if v, err := strconv.ParseFloat(parts[i], 64); err == nil {
+				m.LoadAvg[i] = v
+			}
 		}
 	}
 
@@ -120,7 +122,9 @@ func parseMetrics(output string) (*Metrics, error) {
 		m.CPU = parseCPU(s)
 	}
 	if s, ok := sections["CPU_COUNT"]; ok {
-		m.CPU.Cores, _ = strconv.Atoi(strings.TrimSpace(s))
+		if cores, err := strconv.Atoi(strings.TrimSpace(s)); err == nil {
+			m.CPU.Cores = cores
+		}
 	}
 
 	// Memory

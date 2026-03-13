@@ -111,7 +111,7 @@ const BasicLayout = () => {
     const fetchUnread = () => {
       getUnreadCount()
         .then((res) => setUnreadCount(res?.count || 0))
-        .catch(() => {});
+        .catch((e) => console.warn('获取未读数量失败', e));
     };
     fetchUnread();
     const timer = setInterval(fetchUnread, 30000);
@@ -121,7 +121,7 @@ const BasicLayout = () => {
   const loadNotifications = () => {
     getNotifications({ page: 1, pageSize: 10 })
       .then((res) => setNotifications(res.rows || []))
-      .catch(() => {});
+      .catch((e) => console.warn('获取通知失败', e));
   };
 
   const handleNotifOpen = (open: boolean) => {
@@ -195,7 +195,7 @@ const BasicLayout = () => {
 
   return (
     <ProLayout
-      title="Orion Visor"
+      title="运维平台"
       layout="mix"
       fixSiderbar
       fixedHeader

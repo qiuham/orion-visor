@@ -35,7 +35,7 @@ const MonitorPage = () => {
   useEffect(() => {
     getHostList({ pageSize: 1000, status: 1 })
       .then((res) => setHosts(res.rows || []))
-      .catch(() => {});
+      .catch((e) => console.warn('加载主机列表失败', e));
     return () => wsRef.current?.close();
   }, []);
 
@@ -67,8 +67,8 @@ const MonitorPage = () => {
           return [...prev.slice(-(MAX_HISTORY - 1)), Math.round(pct * 10) / 10];
         });
         setTimeLabels((prev) => [...prev.slice(-(MAX_HISTORY - 1)), now]);
-      } catch {
-        // ignore parse errors
+      } catch (e) {
+        console.warn('解析监控数据失败', e);
       }
     };
 

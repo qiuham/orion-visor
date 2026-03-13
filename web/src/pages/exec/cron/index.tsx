@@ -31,7 +31,7 @@ const CronPage = () => {
   useEffect(() => {
     getHostList({ pageSize: 1000, status: 1 })
       .then((res) => setHosts(res.rows || []))
-      .catch(() => {});
+      .catch((e) => console.warn('加载主机列表失败', e));
   }, []);
 
   const openCreate = () => {

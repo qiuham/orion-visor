@@ -84,8 +84,8 @@ const HostGroupTree: React.FC<HostGroupTreeProps> = ({ selectedGroupId, onSelect
     try {
       const data = await getHostGroupList();
       setGroups(Array.isArray(data) ? data : []);
-    } catch {
-      // ignore
+    } catch (e) {
+      console.warn('加载分组失败', e);
     } finally {
       setLoading(false);
     }

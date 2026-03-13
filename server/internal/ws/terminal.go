@@ -13,8 +13,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"github.com/orion-visor/server/internal/service"
-	internalssh "github.com/orion-visor/server/internal/ssh"
+	"github.com/ops-platform/server/internal/service"
+	internalssh "github.com/ops-platform/server/internal/ssh"
 )
 
 var upgrader = websocket.Upgrader{

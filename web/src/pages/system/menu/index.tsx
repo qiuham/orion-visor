@@ -33,7 +33,7 @@ const MenuPage = () => {
     setLoading(true);
     getMenuList()
       .then((data) => setMenus(buildTree(data || [])))
-      .catch(() => {})
+      .catch((e) => console.warn('加载菜单失败', e))
       .finally(() => setLoading(false));
   }, []);
 

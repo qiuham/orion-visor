@@ -2,7 +2,7 @@ package middleware
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/orion-visor/server/pkg/response"
+	"github.com/ops-platform/server/pkg/response"
 	"gorm.io/gorm"
 )
 

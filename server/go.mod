@@ -1,4 +1,4 @@
-module github.com/orion-visor/server
+module github.com/ops-platform/server
 
 go 1.23.0
 

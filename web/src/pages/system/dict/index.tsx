@@ -30,8 +30,8 @@ const DictPage = () => {
     try {
       const data = await getDictKeys();
       setKeys(data || []);
-    } catch {
-      // ignore
+    } catch (e) {
+      console.warn('加载字典键失败', e);
     } finally {
       setLoading(false);
     }

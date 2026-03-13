@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	internalssh "github.com/orion-visor/server/internal/ssh"
+	internalssh "github.com/ops-platform/server/internal/ssh"
 )
 
 // MonitorSession 管理一个主机的实时监控会话

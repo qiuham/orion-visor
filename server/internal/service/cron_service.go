@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/orion-visor/server/internal/model"
-	internalssh "github.com/orion-visor/server/internal/ssh"
+	"github.com/ops-platform/server/internal/model"
+	internalssh "github.com/ops-platform/server/internal/ssh"
 	"gorm.io/gorm"
 )
 
